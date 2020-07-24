@@ -1,111 +1,204 @@
 document.body.style.border = "5px solid green";
 
-// globals
-let pos = 0;
-let total = 0;
-let links = [];
+console.log("loading RE ext.");
 
-console.log("registered keydown");
+// TODO on refresh, remove current highlight
 
-const getLinks = () => {
-    // use global for now
-    links = document.querySelectorAll('div .link:not(.promotedlink)');
-    console.log("fetching links %o", links);
-    //return links;
-};
+class Listing {
+    //#pos = 0;
+    //#total = 0;
+    //#links = 0;
+    constructor() {
+        this._pos = 0;
+        //this.total = 0;
+        this._links = [];
+    }
 
-const register = () => {
-    document.addEventListener('click', (e) => {
-        console.log("click %o", e);
-    })
-
-    document.addEventListener('keydown', (e) => {
-        console.log("current link %o", getLink(pos));
-        console.log("handle key %o pos  %o total %o", e, pos, total);
-
-        if (e.keyCode == 36) {
-            // home (reset to 0)
+    pos(pos) {
+        if (pos != undefined) {
+            this._pos = pos;
+            console.log("set position to %o", this._pos);
         }
 
-        if (e.keyCode == 36) {
-            // end (set to total)
-        }
+        console.log("get position: [%o]", this._pos);
+        return this._pos;
+    }
 
-        if (e.key == 'j') {
-            // down
-            if (pos > total) return;
-            console.log("j pressed moving pos %o to %o", pos, (pos + 1))
+    total() {
+        if (this._links)
+            return this._links.length;
 
-            pos++;
-            positionUpdated();
-        }
+        return 0;
+    }
 
-        if (e.key == 'k') {
-            // up
-            if (pos == 0) return;
-            console.log('k pressed moving pos %o to %o', pos, (pos - 1));
+    link() {
+        if (this._links[this._pos])
+            return this._links[this._pos];
 
-            pos--;
-            positionUpdated();
-        }
+        return false;
+    }
 
-        if (e.key == 'h') {
-            // hide
-            console.log('h pressed');
-            hideLink();
-        }
-    });
-};
+    links() {
+        console.log("get links %o", this._links);
+        return this._links;
+    }
 
-const positionUpdated = () => {
-    // use `pos`
-    console.log("position updated %o of %o \nlink %o", pos, total, getLink(pos));
-};
+    removeLink(pos) {
+        this._links.splice(pos, 1);
+        console.log("removed entry %o array %o", pos, this._links.length);
+    }
 
-const hideLink = () => {
-    let link = getLink(pos);
-    console.log("hiding link %o %o", pos, link);
-    try {
-        const ev = new MouseEvent('click', {
-            view: window, 
-            bubbles: true, 
-            cancelable: true 
+    refreshLinks() {
+        console.log("fetching links...");
+        this._links = document.querySelectorAll('#siteTable > div.link:not(.promotedlink)');
+        console.log("...found links %o", this._links);
+    }
+
+    register() {
+        document.addEventListener('click', (e) => {
+            console.log("click %o", e);
+            this.tryFindLink(e.target);
         });
 
-        console.log("dispatching click %o on %o", ev, link);
-        let hide = link.querySelector('a[data-event-action="hide"]');
-        console.log("Hide %o", hide);
+        document.addEventListener('keydown', (e) => {
+            this.handleKeys(e);
+        });
+    }
+
+    tryFindLink(el) {
+        let attempt = el.closest('.link');
+        if (!attempt) {
+            console.log("no parent link found");
+            return;
+        }
+
+        const self = this;
+        this._links.forEach((link, index) => {
+            if (link == attempt)
+                self.moveTo(index);
+        });
+    }
+
+    handleKeys(e) {
+        let pos = this.pos();
+        let total = this.total();
+
+        console.debug("handle key pos %o total %o %o", pos, total, e);
+
+        if (e.keyCode == 36) //home
+            this.moveTo(0);
+
+        if (e.keyCode == 35) // end
+            this.moveTo(total -  1);
+
+        if (e.key == 'j')  // down
+            this.moveTo(pos + 1); 
+
+        if (e.key == 'k') // up
+            this.moveTo(pos - 1); 
+
+        if (e.key == 'h')
+            this.hideLink();
+    }
+
+    moveTo(position) {
+        console.log("attempting move to %o", position);
+        let total = this.total();
+
+        if (position >= total || position < 0) {
+            console.log("position %o out of bounds, ignoring", position);
+            return;
+        }
+
+        // TODO bounds check
+        let oldLink = this.link();
+        this.highlight(oldLink, false);
+
+        this.pos(position);
+        let link = this.link();
+        this.highlight(link, true);
+    }
+
+    highlight(link, enable) {
+        if (!link) return; // TODO clean
+
+        if (enable) {
+            console.log("adding highlight to %o", link.id);
+            link.style.backgroundColor = 'yellow';
+        } else {
+            console.log("removing highlight from %o", link.id);
+            link.style.backgroundColor = 'unset';
+        }
+    }
+
+    hideLink() {
+        let link = this.link();
+        console.log("hide link %o", link.id);
+
+        let hide = this._getHideEl(link);
         if (!hide) {
             console.error('Unable to locate hide button for link %o', link);
-            return;
-        } else {
-            let res = hide.dispatchEvent(ev);
-            console.log("dispatch result %o", res);
-            if (res) {
-                // remove successful, remove link from links
-                getLinks();
-                // reapply position to this list
-            }
-        }
-    } catch (e) {
-        console.log("error %o", e);
-    }
-};
+            return false;
+        } 
 
-const getLink = (pos) => {
-    return links[pos];
+        const ev = new MouseEvent('click', {
+            view: window,
+            bubbles: true,
+            cancelable: true
+        });
+
+        let res = hide.dispatchEvent(ev);
+        console.log("dispatch result %o", res);
+
+        if (res) {
+            // remove from dom
+            link.parentNode.removeChild(link);
+
+            // highlight next row
+            this.refreshLinks(); 
+            this.moveTo(this.pos());
+            //this.removeLink(this.pos()); // TODO remove link from array instead of refetch
+            //this.highlight(this.link(), true); 
+        }
+    }
+
+    /**
+     * Fetch the 'hide' link to click
+     * @param {HTMLElement} link 
+     */
+    _getHideEl(link) {
+        return link.querySelector('a[data-event-action="hide"]');
+    }
+
+    main() {
+        console.log("main...");
+        this.refreshLinks();
+        this.moveTo(0); //this.highlight(this.link(), true);
+
+        console.log("links %o total %o", this.links(), this.total());
+        console.log("position %o", this.pos());
+    }
 }
 
-const main = () => {
-    register();
+class Comments {
 
-    getLinks();
-    pos = 0;
-    total = links.length;
+    constructor() {
 
-    console.log("links %o total %o", links, links.length);
-    console.log("position %o", pos);
+    }
 
-};
+    getComments() {
+        this._list = document.querySelectorAll('#siteTable > div.link:not(.promotedlink)');
+    }
+}
 
-main();
+
+console.log("making instance");
+let m = new Listing();
+m.register();
+m.main();
+
+
+let c = new Comments() 
+c.register();
+
+console.log("done %o %o", m, new Date());
