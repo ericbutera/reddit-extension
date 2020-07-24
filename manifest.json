@@ -1,0 +1,16 @@
+{
+    "manifest_version": 2,
+    "name": "Reddit Extension",
+    "version": "0.1",
+    "description": "Erics stuff and things for reddit",
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.reddit.com/*"
+            ],
+            "js": [
+                "extension.js"
+            ]
+        }
+    ]
+}
