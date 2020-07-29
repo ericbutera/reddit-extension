@@ -17,10 +17,8 @@ class Listing {
     pos(pos) {
         if (pos != undefined) {
             this._pos = pos;
-            console.log("set position to %o", this._pos);
         }
 
-        console.log("get position: [%o]", this._pos);
         return this._pos;
     }
 
@@ -39,24 +37,21 @@ class Listing {
     }
 
     links() {
-        console.log("get links %o", this._links);
         return this._links;
     }
 
     removeLink(pos) {
         this._links.splice(pos, 1);
-        console.log("removed entry %o array %o", pos, this._links.length);
     }
 
     refreshLinks() {
-        console.log("fetching links...");
+        // TODO ensure only listing page links
         this._links = document.querySelectorAll('#siteTable > div.link:not(.promotedlink)');
-        console.log("...found links %o", this._links);
     }
 
     register() {
         document.addEventListener('click', (e) => {
-            console.log("click %o", e);
+            // TODO ensure within .linklisting 
             this.tryFindLink(e.target);
         });
 
@@ -68,7 +63,6 @@ class Listing {
     tryFindLink(el) {
         let attempt = el.closest('.link');
         if (!attempt) {
-            console.log("no parent link found");
             return;
         }
 
@@ -82,8 +76,6 @@ class Listing {
     handleKeys(e) {
         let pos = this.pos();
         let total = this.total();
-
-        console.debug("handle key pos %o total %o %o", pos, total, e);
 
         if (e.keyCode == 36) //home
             this.moveTo(0);
@@ -102,11 +94,9 @@ class Listing {
     }
 
     moveTo(position) {
-        console.log("attempting move to %o", position);
         let total = this.total();
 
         if (position >= total || position < 0) {
-            console.log("position %o out of bounds, ignoring", position);
             return;
         }
 
@@ -123,33 +113,20 @@ class Listing {
         if (!link) return; // TODO clean
 
         if (enable) {
-            console.log("adding highlight to %o", link.id);
             link.style.backgroundColor = 'yellow';
         } else {
-            console.log("removing highlight from %o", link.id);
             link.style.backgroundColor = 'unset';
         }
     }
 
     hideLink() {
         let link = this.link();
-        console.log("hide link %o", link.id);
-
         let hide = this._getHideEl(link);
         if (!hide) {
-            console.error('Unable to locate hide button for link %o', link);
             return false;
         } 
 
-        const ev = new MouseEvent('click', {
-            view: window,
-            bubbles: true,
-            cancelable: true
-        });
-
-        let res = hide.dispatchEvent(ev);
-        console.log("dispatch result %o", res);
-
+        let res = hide.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }))
         if (res) {
             // remove from dom
             link.parentNode.removeChild(link);
@@ -171,34 +148,251 @@ class Listing {
     }
 
     main() {
-        console.log("main...");
+        console.log("listing main");
+        this.register();
         this.refreshLinks();
         this.moveTo(0); //this.highlight(this.link(), true);
-
-        console.log("links %o total %o", this.links(), this.total());
-        console.log("position %o", this.pos());
     }
 }
 
 class Comments {
 
     constructor() {
-
+        this._list = [];
+        this._pos = 0;
+        this._comment = undefined;
     }
 
-    getComments() {
-        this._list = document.querySelectorAll('#siteTable > div.link:not(.promotedlink)');
+    comments() { return this_.list; }
+    total() { return this._list.length; }
+    pos() { return this._pos; }
+
+    clear(comment) {
+        // TODO remove highlight
+        //console.debug("moving off comment %o", comment.id);
+        this.highlight(comment, false);
+    }
+
+    comment(comment) {
+        if (comment == this._comment) {
+            //kkconsole.log("detected same selected comment %o", comment.id);
+            return;
+        }
+
+        console.log("selecting new comment %o", comment.id);
+
+        if (this._comment) 
+            this.clear(this._comment);
+
+        this._comment = comment;
+        this.highlight(comment, true);
+    }
+
+    isCollapsed(comment) {
+        return comment.
+    }
+
+    highlight(comment, enable) {
+        if (!comment) return; // TODO clean
+
+        if (enable) {
+            //console.log("adding highlight to %o", comment.id);
+            comment.style.borderLeft = '3px solid yellow';
+        } else {
+            console.log("removing highlight from %o", comment.id);
+            //comment.style.borderLeft = 'unset';
+        }
+    }
+
+    tryFindComment(el) {
+        let attempt = el.closest('.comment');
+        if (!attempt) {
+            // console.log("no parent comment found");
+            return;
+        }
+
+        //console.log("comment %o", attempt.id);
+        this.comment(attempt);
+    }
+
+    handleKeys(e) {
+        console.debug("handle key  %o", e);
+
+        if (this._comment) {
+            if (e.key == 'x')
+                this.toggleCollapse();
+
+            if (e.key == 'j') 
+                this.moveDown();
+
+            if (e.key == 'k')
+                this.moveUp();
+        }
+    }
+
+    findNextChildComment(comment) {
+        /*
+        do i have an immediate .child .comment? 
+
+        nextChild = comment.querySelector('.child .comment')  
+            note: also data-replies="int count"
+            if nextChild != null -> this.comment(nextChild), done!
+            */
+        try {
+            let attempt = comment.querySelector('.child .comment');
+            console.log("findNextChildComment %o found %o", comment.id, attempt);
+            return attempt;
+        } catch (e) {console.log("error %o", e);}
+    }
+
+    findNextSiblingComment(comment) {
+        console.log("findNextSiblingComment %o", comment.id);
+        try {
+            /*
+            try to find next comment after self 
+
+            attempt = comment.nextElementSibling = "div.clearfix" while (not comment attempt nextElementSibling)
+                attempt.hasClass ".comment"? no, try again
+                    attempt = "div.clearfix".nextElementSibiling 
+                        attempt.hasClass ".comment" comment found! 
+                            this.comment(attempt)
+                            */
+            let attempt;
+            attempt = comment.nextElementSibling;
+            if (attempt == null) {
+                console.log("find sibling: none found, null");
+                return false;
+            } else if (attempt.classList.contains('comment')) {
+                console.log("find sibling: found comment %o", attempt.id);
+                return attempt;
+            } else if (attempt != null) {
+                console.log("find sibling: non comment element found %o", attempt);
+                return this.findNextSiblingComment(attempt);
+            }
+        } catch (e) {console.log("error %o", e);}
+    }
+
+    findNextParentComment(comment) {
+        /*
+        el
+        .parentElement // .sitetable .listing
+        .parentElement // div.child
+        .parentElement // div.comment - current comment's thread parent
+        .nextElementSibling // div.clearleft
+        .nextElementSibling // div.comment - next comment!
+        */
+        let up = comment.parentElement;
+        console.log('findNextParentComment up 1 element %o', up);
+        if (!up) return false;
+
+        /*
+        top level 1
+            reply 1a
+                reply 2a <-- here, up one finds reply 1 instead of jumping to top level 2
+        top level 2
+            reply 1a
+            reply 2a
+                reply 3
+            reply 4a
+         */
+        let parent = up.closest('.comment'); // already viewed node!
+        if (parent) {
+            console.log('findNextParent(%o) found parent comment: %o', comment.id, parent.id);
+            return parent;
+        } else {
+            console.log('findNextParent(%o) = null', comment.id);
+            return false;
+        }
+    }
+
+    moveDown() {
+        let attempt;
+
+        let comment = this._comment;
+        attempt = this.findNextChildComment(comment);
+        console.log("- find child %o", attempt);
+        if (attempt)
+            return this.comment(attempt);
+
+        attempt = this.findNextSiblingComment(comment);
+        console.log("- find sibling %o", attempt);
+        if (attempt)
+            return this.comment(attempt);
+
+        let parent = this.findNextParentComment(comment);
+        if (parent) {
+            attempt = this.findNextSiblingComment(parent);
+            if (attempt)
+                return this.comment(attempt);
+        }
+
+        /*
+        div .nestedlisting                              top level comment container
+            div .comment                                first comment
+                div .child          
+                    div .listing                        reply container for first comment
+                        div .comment .noncollapsed      reply 1
+                        div .comment .collapsed         hidden reply 2
+                        div .comment .noncollapsed      reply 3
+            
+            div .comment                                top level second comment
+                div .child
+                    div .listing                        reply container for second comment
+                        div .comment .noncollapsed      reply 1 to second comment
+
+        scenerio: first comment selected, move down: `comment`
+            - try findNextChildComment
+            - try findNextSiblingComment
+            - no moves left
+        */
+    }
+
+    moveUp() {
+    }
+
+    toggleCollapse() {
+        if (!this._comment) return;
+
+        let comment = this._comment;
+        let expandEl = comment.querySelector(".expand");
+
+        let ev = expandEl.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
+        if (!ev) return;
+
+        if (comment.classList.contains('collapsed')) {
+            this.moveDown();
+            this.clear(comment);
+        }
+    }
+
+    register() {
+        document.addEventListener('click', (e) => {
+            //console.log("click %o", e);
+            this.tryFindComment(e.target);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            this.handleKeys(e);
+        });
+    }
+
+    main() {
+        console.log("comment main...");
+        this.register();
+
+        let comment = document.querySelector('.nestedlisting .comment');
+        console.log("first comment %o", comment.id);
+        if (comment)
+            this.comment(comment);
     }
 }
 
 
 console.log("making instance");
 let m = new Listing();
-m.register();
 m.main();
 
-
-let c = new Comments() 
-c.register();
+let c = new Comments();
+c.main();
 
 console.log("done %o %o", m, new Date());
