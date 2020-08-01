@@ -1,4 +1,3 @@
-document.body.style.border = "5px solid green";
 
 console.log("loading RE ext.");
 
@@ -160,6 +159,9 @@ class Comments {
         this._list = [];
         this._pos = 0;
         this._comment = undefined;
+
+        // TODO https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/StorageArea
+        // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Implement_a_settings_page
     }
 
     comments() { return this_.list; }
@@ -193,17 +195,6 @@ class Comments {
         return false;
     }
 
-    isCommentAndVisible(comment) {
-        // todo refactor into comment
-        if (!comment) return false;
-
-        let classList = comment.classList;
-        if (classList.contains('comment') && !classList.contains('collapsed')) {
-            return true;
-        }
-        return false;
-    }
-
     isCollapsed(comment) {
         // todo refactor into comment
         return comment.classList.contains('collapsed');
@@ -229,12 +220,8 @@ class Comments {
 
     tryFindComment(el) {
         let attempt = el.closest('.comment');
-        if (!attempt) {
-            // console.log("no parent comment found");
-            return;
-        }
+        if (!attempt) return false;
 
-        //console.log("comment %o", attempt.id);
         this.comment(attempt);
     }
 
@@ -253,41 +240,52 @@ class Comments {
         }
     }
 
-    findChildComment(comment) {
-        console.log('findChildComment %o', comment.id);
-        /*
-        do i have an immediate .child .comment? 
+    findChild(comment) {
+        console.log('findChild %o', comment.id);
 
-        nextChild = comment.querySelector('.child .comment')  
-            note: also data-replies="int count"
-            if nextChild != null -> this.comment(nextChild), done!
-            */
         try {
             let attempt = comment.querySelector('.child .comment');
-            if (this.isComment(comment)) {
-                console.log("findChildComment %o found %o", comment.id, attempt.id);
+            if (this.isComment(attempt)) {
+                console.log("findChild %o found %o", comment.id, attempt.id);
                 return attempt;
             }
 
-            console.log('findChildComment recurse');
-            return this.findChildComment(attempt);
+            if (attempt) {
+                console.log('findChild recurse');
+                return this.findChild(attempt);
+            }
         } catch (e) {
             console.log("error %o", e);
         }
+
+        return false;
     }
 
-    findSiblingComment(comment) {
-        console.log("findSiblingComment %o", comment.id);
-        try {
-            /*
-            try to find next comment after self 
+    findParent(comment) {
+        console.log('findParent %o', comment.id);
 
-            attempt = comment.nextElementSibling = "div.clearfix" while (not comment attempt nextElementSibling)
-                attempt.hasClass ".comment"? no, try again
-                    attempt = "div.clearfix".nextElementSibiling 
-                        attempt.hasClass ".comment" comment found! 
-                            this.comment(attempt)
-                            */
+        try {
+            let up = comment.parentElement;
+            console.log('findParent up 1 element %o', up);
+            if (!up) return false;
+
+            let parent = up.closest('.comment'); // already viewed node!
+            if (parent) {
+                console.log('findNextParent(%o) found parent comment: %o', comment.id, parent.id);
+                return parent;
+            } 
+
+            console.log('findNextParent(%o) = null', comment.id);
+        } catch (e) {
+            console.log("error %o", e);
+        }
+        return false;
+    }
+
+    findNextSibling(comment) {
+        // try to find next comment after self 
+        console.log("findNextSibling %o", comment.id);
+        try {
             let attempt;
             attempt = comment.nextElementSibling;
             if (!attempt) {
@@ -295,49 +293,17 @@ class Comments {
                 return false;
             } 
             
-            if (this.isCommentAndVisible(attempt)) {
+            if (this.isComment(attempt)) {
                 console.log("find sibling: found comment %o", attempt.id);
                 return attempt;
             } 
             
             console.log("find sibling: recurse %o", attempt);
-            return this.findSiblingComment(attempt); // recurse
+            return this.findNextSibling(attempt); // recurse
         } catch (e) {
             console.log("error %o", e);
         }
-    }
 
-    findParentComment(comment) {
-        console.log('findParentComment %o', comment.id);
-        /*
-        el
-        .parentElement // .sitetable .listing
-        .parentElement // div.child
-        .parentElement // div.comment - current comment's thread parent
-        .nextElementSibling // div.clearleft
-        .nextElementSibling // div.comment - next comment!
-        */
-        let up = comment.parentElement;
-        console.log('findParentComment up 1 element %o', up);
-        if (!up) return false;
-
-        /*
-        top level 1
-            reply 1a
-                reply 2a <-- here, up one finds reply 1 instead of jumping to top level 2
-        top level 2
-            reply 1a
-            reply 2a
-                reply 3
-            reply 4a
-         */
-        let parent = up.closest('.comment'); // already viewed node!
-        if (parent) {
-            console.log('findNextParent(%o) found parent comment: %o', comment.id, parent.id);
-            return parent;
-        } 
-
-        console.log('findNextParent(%o) = null', comment.id);
         return false;
     }
 
@@ -351,7 +317,7 @@ class Comments {
                 return false;
             } 
             
-            if (this.isCommentAndVisible(attempt)) {
+            if (this.isComment(attempt)) {
                 console.log("find prev sibling: found comment %o", attempt.id);
                 return attempt;
             } 
@@ -361,92 +327,41 @@ class Comments {
         } catch (e) {
             console.log("error %o", e);
         }
+
+        return false;
     }
 
     upAndNext(comment) {
         console.log('upAndNext %o', comment.id);
-        let parent = this.findParentComment(comment);
-        if (parent) {
-            console.log('upAndNext found parent %o', parent);
-            let sibling = this.findSiblingComment(parent);
-            if (sibling) {
-                console.log('upAndNext find sibling %o [findSiblingComment]', sibling);
-                return this.comment(sibling);
-            }
+        let parent = this.findParent(comment);
+        if (!parent) return; 
 
-            // have to try moving up and next again
-            return this.upAndNext(parent);
+        console.log('upAndNext found parent %o', parent);
+        let sibling = this.findNextSibling(parent);
+        if (sibling) {
+            console.log('upAndNext find sibling %o [findNextSibling]', sibling);
+            return this.comment(sibling);
         }
+
+        this.upAndNext(parent);
     }
 
     moveDown() {
         let comment = this._comment;
         let attempt;
-        // TODO refactor like behavior after working
-        /*
-         * Always try to move down and right
-         * Allow selecting of collapsed comments. But don't allow navigating into them without expanding
-
-         Current bug with this:
-         Parent visible
-         - First child collapsed
-         - Second child visible
-         Second Parent
-
-         If on Parent vis and try to move down, code will select Second parent which skips "Second child vis"
-         */
-
         console.log("moveDown from %o", comment.id);
 
-        if (this.isCollapsed(comment)) {
-            // comment is hidden... need to jump to next visible
-            console.log("- moveDown detected currrent node is collapsed, finding next sibling");
-            attempt = this.findSiblingComment(comment);
-            if (attempt) {
-                console.log('- moveDown attempt %o', attempt);
+        if (!this.isCollapsed(comment)) {
+            attempt = this.findChild(comment);
+            if (attempt)
                 return this.comment(attempt);
-            } else {
-                console.log('move Down attempt failed %o', attempt);
-            }
         }
 
-        // if child commment is collapsed, jump to next sibling
-
-        attempt = this.findChildComment(comment);
-        if (attempt) console.log("comment %o found child %o", comment.id, attempt.id);
-
-        if (attempt && !this.isCollapsed(attempt)) {
+        attempt = this.findNextSibling(comment);
+        if (attempt) 
             return this.comment(attempt);
-        }
 
-        attempt = this.findSiblingComment(comment);
-        if (attempt && !this.isCollapsed(attempt)) {
-            console.log("- moveDown find sibling %o [findSiblingComment]", attempt);
-            return this.comment(attempt);
-        }
-
-        console.log('- moveDown, upAndNext...');
-        return this.upAndNext(comment);
-
-        /*
-        div .nestedlisting                              top level comment container
-            div .comment                                first comment
-                div .child          
-                    div .listing                        reply container for first comment
-                        div .comment .noncollapsed      reply 1
-                        div .comment .collapsed         hidden reply 2
-                        div .comment .noncollapsed      reply 3
-            
-            div .comment                                top level second comment
-                div .child
-                    div .listing                        reply container for second comment
-                        div .comment .noncollapsed      reply 1 to second comment
-
-        scenerio: first comment selected, move down: `comment`
-            - try findChildComment
-            - try findSiblingComment
-            - no moves left
-        */
+        this.upAndNext(comment);
     }
 
     moveUp() {
@@ -459,10 +374,11 @@ class Comments {
             return this.comment(attempt);
 
         // 2: find parent node
-        let parent = this.findParentComment(comment);
-        if (parent) {
-            this.comment(parent);
-        }
+        attempt = this.findParent(comment);
+        if (attempt)
+            return this.comment(attempt);
+
+        // it might be nice to say if parent found, jump to last comment?
     }
 
     toggleCollapse() {
@@ -472,12 +388,6 @@ class Comments {
         let expandEl = comment.querySelector(".expand");
 
         let ev = expandEl.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
-        if (!ev) return;
-
-        /*if (this.isCollapsed(comment)) {
-            this.moveDown();
-            this.clear(comment);
-        }*/
     }
 
     setDebugIds() {
@@ -513,18 +423,22 @@ class Comments {
         this.setDebugIds();
 
         let comment = document.querySelector('.nestedlisting .comment');
-        console.log("first comment %o", comment.id);
         if (comment)
             this.comment(comment);
     }
 }
 
 
-console.log("making instance");
-let m = new Listing();
-m.main();
 
-let c = new Comments();
-c.main();
+try {
+    console.log("making instance");
+    let m = new Listing();
+    m.main();
 
-console.log("done %o %o", m, new Date());
+    let c = new Comments();
+    c.main();
+
+    console.log("done %o %o", m, new Date());
+} catch(e) {
+    console.log("err %o", e);
+}
