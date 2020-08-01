@@ -265,7 +265,7 @@ class Comments {
         try {
             let attempt = comment.querySelector('.child .comment');
             if (this.isComment(comment)) {
-                console.log("findChildComment %o found %o", comment.id, attempt);
+                console.log("findChildComment %o found %o", comment.id, attempt.id);
                 return attempt;
             }
 
@@ -383,6 +383,18 @@ class Comments {
         let comment = this._comment;
         let attempt;
         // TODO refactor like behavior after working
+        /*
+         * Always try to move down and right
+         * Allow selecting of collapsed comments. But don't allow navigating into them without expanding
+
+         Current bug with this:
+         Parent visible
+         - First child collapsed
+         - Second child visible
+         Second Parent
+
+         If on Parent vis and try to move down, code will select Second parent which skips "Second child vis"
+         */
 
         console.log("moveDown from %o", comment.id);
 
@@ -401,6 +413,8 @@ class Comments {
         // if child commment is collapsed, jump to next sibling
 
         attempt = this.findChildComment(comment);
+        if (attempt) console.log("comment %o found child %o", comment.id, attempt.id);
+
         if (attempt && !this.isCollapsed(attempt)) {
             return this.comment(attempt);
         }
@@ -466,6 +480,21 @@ class Comments {
         }*/
     }
 
+    setDebugIds() {
+        let comments = document.querySelectorAll('.nestedlisting .comment:not(.has-debug)');
+        comments.forEach(function(comment){
+            let debug = document.createElement('div');
+            debug.style="display: inline-block; max-width: 100px; border: 1px solid #ccc; border-radius: 3px; background-color: #eee; padding: 1px 4px 1px 4px;"
+            debug.innerText = comment.id;
+
+            let author = comment.querySelector('.author');
+            author.parentElement.appendChild(debug);
+
+            console.log("comment %o debug %o", comment.id, debug);
+            comment.classList.add('has-debug');
+        });
+    }
+
     register() {
         document.addEventListener('click', (e) => {
             //console.log("click %o", e);
@@ -480,6 +509,8 @@ class Comments {
     main() {
         console.log("comment main...");
         this.register();
+
+        this.setDebugIds();
 
         let comment = document.querySelector('.nestedlisting .comment');
         console.log("first comment %o", comment.id);
