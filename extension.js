@@ -1,5 +1,5 @@
 
-console.log("loading RE ext.");
+console.info("loading RE ext.");
 
 // TODO on refresh, remove current highlight
 
@@ -147,7 +147,7 @@ class Listing {
     }
 
     main() {
-        console.log("listing main");
+        console.debug("listing main");
         this.register();
         this.refreshLinks();
         this.moveTo(0); //this.highlight(this.link(), true);
@@ -175,7 +175,7 @@ class Comments {
 
     comment(comment) {
         if (comment == this._comment) {
-            //console.log("detected same selected comment %o", comment.id);
+            //console.debug("detected same selected comment %o", comment.id);
             return;
         }
 
@@ -210,10 +210,10 @@ class Comments {
         if (!comment) return; // TODO clean
 
         if (enable) {
-            //console.log("adding highlight to %o", comment.id);
+            //console.debug("adding highlight to %o", comment.id);
             comment.style.borderLeft = '3px solid yellow';
         } else {
-            //console.log("removing highlight from %o", comment.id);
+            //console.debug("removing highlight from %o", comment.id);
             comment.style.borderLeft = 'unset';
         }
     }
@@ -241,67 +241,67 @@ class Comments {
     }
 
     findChild(comment) {
-        console.log('findChild %o', comment.id);
+        console.debug('findChild %o', comment.id);
 
         try {
             let attempt = comment.querySelector('.child .comment');
             if (this.isComment(attempt)) {
-                console.log("findChild %o found %o", comment.id, attempt.id);
+                console.debug("findChild %o found %o", comment.id, attempt.id);
                 return attempt;
             }
 
             if (attempt) {
-                console.log('findChild recurse');
+                console.debug('findChild recurse');
                 return this.findChild(attempt);
             }
         } catch (e) {
-            console.log("error %o", e);
+            console.debug("error %o", e);
         }
 
         return false;
     }
 
     findParent(comment) {
-        console.log('findParent %o', comment.id);
+        console.debug('findParent %o', comment.id);
 
         try {
             let up = comment.parentElement;
-            console.log('findParent up 1 element %o', up);
+            console.debug('findParent up 1 element %o', up);
             if (!up) return false;
 
             let parent = up.closest('.comment'); // already viewed node!
             if (parent) {
-                console.log('findNextParent(%o) found parent comment: %o', comment.id, parent.id);
+                console.debug('findNextParent(%o) found parent comment: %o', comment.id, parent.id);
                 return parent;
             } 
 
-            console.log('findNextParent(%o) = null', comment.id);
+            console.debug('findNextParent(%o) = null', comment.id);
         } catch (e) {
-            console.log("error %o", e);
+            console.debug("error %o", e);
         }
         return false;
     }
 
     findNextSibling(comment) {
         // try to find next comment after self 
-        console.log("findNextSibling %o", comment.id);
+        console.debug("findNextSibling %o", comment.id);
         try {
             let attempt;
             attempt = comment.nextElementSibling;
             if (!attempt) {
-                console.log("find sibling: none found, null");
+                console.debug("find sibling: none found, null");
                 return false;
             } 
             
             if (this.isComment(attempt)) {
-                console.log("find sibling: found comment %o", attempt.id);
+                console.debug("find sibling: found comment %o", attempt.id);
                 return attempt;
             } 
             
-            console.log("find sibling: recurse %o", attempt);
+            console.debug("find sibling: recurse %o", attempt);
             return this.findNextSibling(attempt); // recurse
         } catch (e) {
-            console.log("error %o", e);
+            console.debug("error %o", e);
         }
 
         return false;
@@ -309,37 +309,37 @@ class Comments {
 
     findPreviousSibling(comment) {
         try {
-            console.log('findPreviousSibling %o', comment.id);
+            console.debug('findPreviousSibling %o', comment.id);
             let attempt;
             attempt = comment.previousElementSibling;
             if (!attempt) {
-                console.log("find prev sibling: none found, null");
+                console.debug("find prev sibling: none found, null");
                 return false;
             } 
             
             if (this.isComment(attempt)) {
-                console.log("find prev sibling: found comment %o", attempt.id);
+                console.debug("find prev sibling: found comment %o", attempt.id);
                 return attempt;
             } 
 
-            console.log("find prev sibling: non comment element found %o", attempt);
+            console.debug("find prev sibling: non comment element found %o", attempt);
             return this.findPreviousSibling(attempt); // recurse up
         } catch (e) {
-            console.log("error %o", e);
+            console.debug("error %o", e);
         }
 
         return false;
     }
 
     upAndNext(comment) {
-        console.log('upAndNext %o', comment.id);
+        console.debug('upAndNext %o', comment.id);
         let parent = this.findParent(comment);
         if (!parent) return; 
 
-        console.log('upAndNext found parent %o', parent);
+        console.debug('upAndNext found parent %o', parent);
         let sibling = this.findNextSibling(parent);
         if (sibling) {
-            console.log('upAndNext find sibling %o [findNextSibling]', sibling);
+            console.debug('upAndNext find sibling %o [findNextSibling]', sibling);
             return this.comment(sibling);
         }
 
@@ -349,7 +349,7 @@ class Comments {
     moveDown() {
         let comment = this._comment;
         let attempt;
-        console.log("moveDown from %o", comment.id);
+        console.debug("moveDown from %o", comment.id);
 
         if (!this.isCollapsed(comment)) {
             attempt = this.findChild(comment);
@@ -400,14 +400,14 @@ class Comments {
             let author = comment.querySelector('.author');
             author.parentElement.appendChild(debug);
 
-            console.log("comment %o debug %o", comment.id, debug);
+            console.debug("comment %o debug %o", comment.id, debug);
             comment.classList.add('has-debug');
         });
     }
 
     register() {
         document.addEventListener('click', (e) => {
-            //console.log("click %o", e);
+            //console.debug("click %o", e);
             this.tryFindComment(e.target);
         });
 
@@ -417,7 +417,7 @@ class Comments {
     }
 
     main() {
-        console.log("comment main...");
+        console.debug("comment main...");
         this.register();
 
         this.setDebugIds();
@@ -431,14 +431,15 @@ class Comments {
 
 
 try {
-    console.log("making instance");
+    console.debug("making listing instance");
     let m = new Listing();
     m.main();
 
+    console.debug("making comment instance");
     let c = new Comments();
     c.main();
 
-    console.log("done %o %o", m, new Date());
+    console.info("done %o %o", m, new Date());
 } catch(e) {
-    console.log("err %o", e);
+    console.debug("err %o", e);
 }
