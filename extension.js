@@ -156,7 +156,6 @@ class Listing {
 }
 
 class Comments {
-
     constructor() {
         this._list = [];
         this._pos = 0;
@@ -168,18 +167,17 @@ class Comments {
     pos() { return this._pos; }
 
     clear(comment) {
-        // TODO remove highlight
         //console.debug("moving off comment %o", comment.id);
         this.highlight(comment, false);
     }
 
     comment(comment) {
         if (comment == this._comment) {
-            //kkconsole.log("detected same selected comment %o", comment.id);
+            //console.log("detected same selected comment %o", comment.id);
             return;
         }
 
-        console.log("selecting new comment %o", comment.id);
+        console.debug("selecting new comment %o", comment);
 
         if (this._comment) 
             this.clear(this._comment);
@@ -188,19 +186,44 @@ class Comments {
         this.highlight(comment, true);
     }
 
+    isComment(comment) {
+        if (comment && comment.classList.contains('comment'))
+            return true;
+
+        return false;
+    }
+
+    isCommentAndVisible(comment) {
+        // todo refactor into comment
+        if (!comment) return false;
+
+        let classList = comment.classList;
+        if (classList.contains('comment') && !classList.contains('collapsed')) {
+            return true;
+        }
+        return false;
+    }
+
     isCollapsed(comment) {
-        return comment.
+        // todo refactor into comment
+        return comment.classList.contains('collapsed');
+    }
+
+    getData(comment) {
+        // todo refactor into comment
+        return comment.dataset;
     }
 
     highlight(comment, enable) {
+        // todo refactor into comment
         if (!comment) return; // TODO clean
 
         if (enable) {
             //console.log("adding highlight to %o", comment.id);
             comment.style.borderLeft = '3px solid yellow';
         } else {
-            console.log("removing highlight from %o", comment.id);
-            //comment.style.borderLeft = 'unset';
+            //console.log("removing highlight from %o", comment.id);
+            comment.style.borderLeft = 'unset';
         }
     }
 
@@ -230,7 +253,8 @@ class Comments {
         }
     }
 
-    findNextChildComment(comment) {
+    findChildComment(comment) {
+        console.log('findChildComment %o', comment.id);
         /*
         do i have an immediate .child .comment? 
 
@@ -240,13 +264,20 @@ class Comments {
             */
         try {
             let attempt = comment.querySelector('.child .comment');
-            console.log("findNextChildComment %o found %o", comment.id, attempt);
-            return attempt;
-        } catch (e) {console.log("error %o", e);}
+            if (this.isComment(comment)) {
+                console.log("findChildComment %o found %o", comment.id, attempt);
+                return attempt;
+            }
+
+            console.log('findChildComment recurse');
+            return this.findChildComment(attempt);
+        } catch (e) {
+            console.log("error %o", e);
+        }
     }
 
-    findNextSiblingComment(comment) {
-        console.log("findNextSiblingComment %o", comment.id);
+    findSiblingComment(comment) {
+        console.log("findSiblingComment %o", comment.id);
         try {
             /*
             try to find next comment after self 
@@ -259,20 +290,25 @@ class Comments {
                             */
             let attempt;
             attempt = comment.nextElementSibling;
-            if (attempt == null) {
+            if (!attempt) {
                 console.log("find sibling: none found, null");
                 return false;
-            } else if (attempt.classList.contains('comment')) {
+            } 
+            
+            if (this.isCommentAndVisible(attempt)) {
                 console.log("find sibling: found comment %o", attempt.id);
                 return attempt;
-            } else if (attempt != null) {
-                console.log("find sibling: non comment element found %o", attempt);
-                return this.findNextSiblingComment(attempt);
-            }
-        } catch (e) {console.log("error %o", e);}
+            } 
+            
+            console.log("find sibling: recurse %o", attempt);
+            return this.findSiblingComment(attempt); // recurse
+        } catch (e) {
+            console.log("error %o", e);
+        }
     }
 
-    findNextParentComment(comment) {
+    findParentComment(comment) {
+        console.log('findParentComment %o', comment.id);
         /*
         el
         .parentElement // .sitetable .listing
@@ -282,7 +318,7 @@ class Comments {
         .nextElementSibling // div.comment - next comment!
         */
         let up = comment.parentElement;
-        console.log('findNextParentComment up 1 element %o', up);
+        console.log('findParentComment up 1 element %o', up);
         if (!up) return false;
 
         /*
@@ -299,32 +335,84 @@ class Comments {
         if (parent) {
             console.log('findNextParent(%o) found parent comment: %o', comment.id, parent.id);
             return parent;
-        } else {
-            console.log('findNextParent(%o) = null', comment.id);
-            return false;
+        } 
+
+        console.log('findNextParent(%o) = null', comment.id);
+        return false;
+    }
+
+    findPreviousSibling(comment) {
+        try {
+            console.log('findPreviousSibling %o', comment.id);
+            let attempt;
+            attempt = comment.previousElementSibling;
+            if (!attempt) {
+                console.log("find prev sibling: none found, null");
+                return false;
+            } 
+            
+            if (this.isCommentAndVisible(attempt)) {
+                console.log("find prev sibling: found comment %o", attempt.id);
+                return attempt;
+            } 
+
+            console.log("find prev sibling: non comment element found %o", attempt);
+            return this.findPreviousSibling(attempt); // recurse up
+        } catch (e) {
+            console.log("error %o", e);
+        }
+    }
+
+    upAndNext(comment) {
+        console.log('upAndNext %o', comment.id);
+        let parent = this.findParentComment(comment);
+        if (parent) {
+            console.log('upAndNext found parent %o', parent);
+            let sibling = this.findSiblingComment(parent);
+            if (sibling) {
+                console.log('upAndNext find sibling %o [findSiblingComment]', sibling);
+                return this.comment(sibling);
+            }
+
+            // have to try moving up and next again
+            return this.upAndNext(parent);
         }
     }
 
     moveDown() {
-        let attempt;
-
         let comment = this._comment;
-        attempt = this.findNextChildComment(comment);
-        console.log("- find child %o", attempt);
-        if (attempt)
-            return this.comment(attempt);
+        let attempt;
+        // TODO refactor like behavior after working
 
-        attempt = this.findNextSiblingComment(comment);
-        console.log("- find sibling %o", attempt);
-        if (attempt)
-            return this.comment(attempt);
+        console.log("moveDown from %o", comment.id);
 
-        let parent = this.findNextParentComment(comment);
-        if (parent) {
-            attempt = this.findNextSiblingComment(parent);
-            if (attempt)
+        if (this.isCollapsed(comment)) {
+            // comment is hidden... need to jump to next visible
+            console.log("- moveDown detected currrent node is collapsed, finding next sibling");
+            attempt = this.findSiblingComment(comment);
+            if (attempt) {
+                console.log('- moveDown attempt %o', attempt);
                 return this.comment(attempt);
+            } else {
+                console.log('move Down attempt failed %o', attempt);
+            }
         }
+
+        // if child commment is collapsed, jump to next sibling
+
+        attempt = this.findChildComment(comment);
+        if (attempt && !this.isCollapsed(attempt)) {
+            return this.comment(attempt);
+        }
+
+        attempt = this.findSiblingComment(comment);
+        if (attempt && !this.isCollapsed(attempt)) {
+            console.log("- moveDown find sibling %o [findSiblingComment]", attempt);
+            return this.comment(attempt);
+        }
+
+        console.log('- moveDown, upAndNext...');
+        return this.upAndNext(comment);
 
         /*
         div .nestedlisting                              top level comment container
@@ -341,13 +429,26 @@ class Comments {
                         div .comment .noncollapsed      reply 1 to second comment
 
         scenerio: first comment selected, move down: `comment`
-            - try findNextChildComment
-            - try findNextSiblingComment
+            - try findChildComment
+            - try findSiblingComment
             - no moves left
         */
     }
 
     moveUp() {
+        // 1: find previous sibling
+        let attempt;
+        let comment = this._comment;
+
+        attempt = this.findPreviousSibling(comment);
+        if (attempt) 
+            return this.comment(attempt);
+
+        // 2: find parent node
+        let parent = this.findParentComment(comment);
+        if (parent) {
+            this.comment(parent);
+        }
     }
 
     toggleCollapse() {
@@ -359,10 +460,10 @@ class Comments {
         let ev = expandEl.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
         if (!ev) return;
 
-        if (comment.classList.contains('collapsed')) {
+        /*if (this.isCollapsed(comment)) {
             this.moveDown();
             this.clear(comment);
-        }
+        }*/
     }
 
     register() {
