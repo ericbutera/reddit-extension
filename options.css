@@ -1,0 +1,125 @@
+/* options.css - styles for options page */
+body {
+  font-family: Arial, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevents the main window from scrolling */
+  font-family: sans-serif;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Lock to screen height */
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+header {
+  flex-shrink: 0; /* Header won't shrink */
+  margin-bottom: 20px;
+}
+
+/* The Layout Engine */
+.panels {
+  display: flex;
+  flex: 1; /* Takes up all remaining vertical space */
+  gap: 20px;
+  overflow: hidden; /* Critical: keeps the panels from expanding the page */
+}
+
+/* Scrollable Left Panel */
+.left-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#subsList {
+  flex: 1;
+  overflow-y: auto; /* This enables the scrolling for the list */
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin: 0;
+  list-style: none;
+}
+
+/* Fixed Right Panel */
+.right-panel {
+  width: 320px;
+  flex-shrink: 0; /* Stops the right panel from getting squashed */
+  display: flex;
+  flex-direction: column;
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.pending-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#pendingList {
+  flex: 1;
+  overflow-y: auto; /* If pending list gets long, it scrolls too */
+  margin-bottom: 15px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+/* sub list */
+#addInput {
+  padding: 6px 8px;
+  font-size: 14px;
+}
+#addBtn {
+  margin-left: 8px;
+  padding: 6px 10px;
+}
+#subsList {
+  list-style: none;
+  padding: 0;
+  margin-top: 12px;
+}
+#subsList li.sub-item {
+  margin: 4px 0;
+  display: flex;
+  align-items: center;
+}
+#subsList .sub-name {
+  margin-right: 8px;
+  flex: none;
+  word-break: break-word;
+}
+#pendingList {
+  list-style: none;
+  padding: 0;
+  margin-top: 8px;
+}
+#pendingList .pending-item {
+  padding: 4px 6px;
+}
+#pendingList .pending-item.remove {
+  color: #a33;
+}
+#pendingList .pending-item.add {
+  color: #1a7;
+}
+.staged-remove {
+  opacity: 0.6;
+  text-decoration: line-through;
+}

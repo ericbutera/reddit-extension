@@ -3,6 +3,16 @@
     "name": "Reddit Extension",
     "version": "0.1",
     "description": "Erics stuff and things for reddit",
+    "permissions": [
+        "storage"
+    ],
+    "background": {
+        "scripts": [
+            "background.js"
+        ],
+        "persistent": false
+    },
+    "options_page": "options.html",
     "content_scripts": [
         {
             "matches": [
