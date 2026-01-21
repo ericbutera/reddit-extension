@@ -8,7 +8,26 @@
   <body>
     <div class="container">
       <header>
-        <h1>Ignored Subreddits</h1>
+        <div class="header-top">
+          <h1>Ignored Subreddits</h1>
+
+          <div class="header-actions row">
+            <button
+              id="import"
+              onclick="document.getElementById('file').click()"
+            >
+              Import JSON
+            </button>
+            <input
+              id="file"
+              type="file"
+              accept="application/json"
+              style="display: none"
+            />
+
+            <button id="export">Export JSON</button>
+          </div>
+        </div>
       </header>
 
       <div class="panels">
@@ -18,37 +37,19 @@
         </div>
 
         <div class="right-panel">
+          <h2>Pending Changes</h2>
+
           <div class="row">
             <input id="addInput" placeholder="subreddit name (no /r/)" />
             <button id="addBtn">Add</button>
           </div>
 
           <div class="pending-panel">
-            <h2>Pending Changes</h2>
             <p>Staged adds/removals.</p>
             <ul id="pendingList"></ul>
-
             <div class="row">
               <button id="discardChanges">Discard</button>
               <button id="saveChanges">Save Changes</button>
-            </div>
-
-            <hr style="width: 100%; margin: 15px 0" />
-
-            <div class="row">
-              <button id="export">Export JSON</button>
-              <button
-                id="import"
-                onclick="document.getElementById('file').click()"
-              >
-                Import JSON
-              </button>
-              <input
-                id="file"
-                type="file"
-                accept="application/json"
-                style="display: none"
-              />
             </div>
           </div>
         </div>
