@@ -1,0 +1,41 @@
+/* toast.css - styles for extension undo toast */
+.re-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  z-index: 999999;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: inherit;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.re-toast .re-toast-msg {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 48ch;
+}
+
+.re-toast .re-toast-undo {
+  background: #fff;
+  color: #000;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.re-toast .re-toast-undo:active {
+  transform: translateY(1px);
+}
+.re-toast.hidden {
+  opacity: 0;
+  pointer-events: none;
+}

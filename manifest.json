@@ -1,8 +1,8 @@
 {
     "manifest_version": 2,
-    "name": "Reddit Extension",
-    "version": "0.1",
-    "description": "Erics stuff and things for reddit",
+    "name": "Reddit tools",
+    "version": "0.2",
+    "description": "Keyboard shortcuts & subreddit management for Reddit.",
     "permissions": [
         "storage"
     ],
@@ -17,6 +17,9 @@
         {
             "matches": [
                 "*://*.reddit.com/*"
+            ],
+            "css": [
+                "toast.css"
             ],
             "js": [
                 "extension.js"

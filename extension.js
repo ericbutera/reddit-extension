@@ -65,6 +65,55 @@ function sendMessageAsync(message) {
   });
 }
 
+// show a temporary toast with Undo action
+let __re_toast_el = null;
+function showUndoToast(text, undoFn, timeout = 5000) {
+  try {
+    // remove existing
+    if (__re_toast_el) __re_toast_el.remove();
+
+    const el = document.createElement("div");
+    el.className = "re-toast";
+
+    const msg = document.createElement("span");
+    msg.className = "re-toast-msg";
+    msg.textContent = text;
+    el.appendChild(msg);
+
+    const btn = document.createElement("button");
+    btn.className = "re-toast-undo";
+    btn.textContent = "Undo";
+    el.appendChild(btn);
+
+    let removed = false;
+    const cleanup = () => {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      __re_toast_el = null;
+    };
+
+    const timer = setTimeout(() => {
+      if (!removed) cleanup();
+    }, timeout);
+
+    btn.addEventListener("click", async () => {
+      if (removed) return;
+      removed = true;
+      clearTimeout(timer);
+      try {
+        await undoFn();
+      } catch (e) {
+        console.error("undo error", e);
+      }
+      cleanup();
+    });
+
+    document.body.appendChild(el);
+    __re_toast_el = el;
+  } catch (e) {
+    console.error("showUndoToast error", e);
+  }
+}
+
 // TODO on refresh, remove current highlight
 
 class Listing {
@@ -113,7 +162,6 @@ class Listing {
 
   filterIgnoredLinks() {
     this._getLinks().forEach((row) => {
-      console.log("filtering %o", row);
       try {
         const subreddit = row.dataset["subreddit"];
         const ignored = IGNORED_SUBS.includes(subreddit);
@@ -176,6 +224,8 @@ class Listing {
       this.moveTo(pos - 1);
 
     if (e.key == "h") this.hideLink();
+
+    if (e.key == "i") this.ignoreSubreddit();
   }
 
   moveTo(position) {
@@ -231,6 +281,55 @@ class Listing {
   }
 
   /**
+   * Ignore the subreddit for the currently highlighted link.
+   * Persists the subreddit to ignored list and removes the row from the DOM.
+   */
+  ignoreSubreddit() {
+    const link = this.link();
+    if (!link) return false;
+
+    try {
+      const subreddit = link.dataset && link.dataset.subreddit;
+      if (!subreddit) return false;
+
+      // preserve DOM node and position for potential undo
+      const parent = link.parentNode;
+      const nextSibling = link.nextSibling;
+      const removedNode = link;
+
+      addIgnoredSub(subreddit);
+
+      // remove from DOM immediately
+      if (parent && removedNode.parentNode) parent.removeChild(removedNode);
+
+      // refresh links and keep position on the next item
+      this.refreshLinks();
+      this.moveTo(this.pos());
+
+      // show undo toast which will re-insert node and remove from ignored list
+      showUndoToast(`${subreddit} ignored`, async () => {
+        try {
+          // remove from ignored list
+          removeIgnoredSub(subreddit);
+          // re-insert DOM node if possible
+          if (parent) parent.insertBefore(removedNode, nextSibling);
+          // re-refresh links so navigation works
+          this.refreshLinks();
+          return true;
+        } catch (e) {
+          console.error("undo restore error", e);
+          return false;
+        }
+      });
+
+      return true;
+    } catch (e) {
+      console.error("ignoreSubreddit error", e);
+      return false;
+    }
+  }
+
+  /**
    * Fetch the 'hide' link to click
    * @param {HTMLElement} link
    */
@@ -239,10 +338,9 @@ class Listing {
   }
 
   main() {
-    console.debug("listing main");
     this.register();
     this.refreshLinks();
-    this.moveTo(0); //this.highlight(this.link(), true);
+    this.moveTo(0);
   }
 }
 
@@ -267,17 +365,13 @@ class Comments {
   }
 
   clear(comment) {
-    //console.debug("moving off comment %o", comment.id);
     this.highlight(comment, false);
   }
 
   comment(comment) {
     if (comment == this._comment) {
-      //console.debug("detected same selected comment %o", comment.id);
       return;
     }
-
-    console.debug("selecting new comment %o", comment);
 
     if (this._comment) this.clear(this._comment);
 
@@ -306,10 +400,8 @@ class Comments {
     if (!comment) return; // TODO clean
 
     if (enable) {
-      //console.debug("adding highlight to %o", comment.id);
       comment.style.borderLeft = "3px solid yellow";
     } else {
-      //console.debug("removing highlight from %o", comment.id);
       comment.style.borderLeft = "unset";
     }
   }
@@ -322,8 +414,6 @@ class Comments {
   }
 
   handleKeys(e) {
-    console.debug("handle key  %o", e);
-
     if (this._comment) {
       if (e.key == "x") this.toggleCollapse();
 
@@ -334,71 +424,51 @@ class Comments {
   }
 
   findChild(comment) {
-    console.debug("findChild %o", comment.id);
-
     try {
       let attempt = comment.querySelector(".child .comment");
       if (this.isComment(attempt)) {
-        console.debug("findChild %o found %o", comment.id, attempt.id);
         return attempt;
       }
 
       if (attempt) {
-        console.debug("findChild recurse");
         return this.findChild(attempt);
       }
     } catch (e) {
-      console.debug("error %o", e);
+      console.error("findChild error %o", e);
     }
 
     return false;
   }
 
   findParent(comment) {
-    console.debug("findParent %o", comment.id);
-
     try {
       let up = comment.parentElement;
-      console.debug("findParent up 1 element %o", up);
       if (!up) return false;
 
       let parent = up.closest(".comment"); // already viewed node!
       if (parent) {
-        console.debug(
-          "findNextParent(%o) found parent comment: %o",
-          comment.id,
-          parent.id,
-        );
         return parent;
       }
-
-      console.debug("findNextParent(%o) = null", comment.id);
     } catch (e) {
-      console.debug("error %o", e);
+      console.error("findParent error %o", e);
     }
     return false;
   }
 
   findNextSibling(comment) {
-    // try to find next comment after self
-    console.debug("findNextSibling %o", comment.id);
     try {
       let attempt;
       attempt = comment.nextElementSibling;
       if (!attempt) {
-        console.debug("find sibling: none found, null");
         return false;
       }
 
       if (this.isComment(attempt)) {
-        console.debug("find sibling: found comment %o", attempt.id);
         return attempt;
       }
-
-      console.debug("find sibling: recurse %o", attempt);
       return this.findNextSibling(attempt); // recurse
     } catch (e) {
-      console.debug("error %o", e);
+      console.error("error %o", e);
     }
 
     return false;
@@ -406,37 +476,30 @@ class Comments {
 
   findPreviousSibling(comment) {
     try {
-      console.debug("findPreviousSibling %o", comment.id);
       let attempt;
       attempt = comment.previousElementSibling;
       if (!attempt) {
-        console.debug("find prev sibling: none found, null");
         return false;
       }
 
       if (this.isComment(attempt)) {
-        console.debug("find prev sibling: found comment %o", attempt.id);
         return attempt;
       }
 
-      console.debug("find prev sibling: non comment element found %o", attempt);
       return this.findPreviousSibling(attempt); // recurse up
     } catch (e) {
-      console.debug("error %o", e);
+      console.error("error %o", e);
     }
 
     return false;
   }
 
   upAndNext(comment) {
-    console.debug("upAndNext %o", comment.id);
     let parent = this.findParent(comment);
     if (!parent) return;
 
-    console.debug("upAndNext found parent %o", parent);
     let sibling = this.findNextSibling(parent);
     if (sibling) {
-      console.debug("upAndNext find sibling %o [findNextSibling]", sibling);
       return this.comment(sibling);
     }
 
@@ -446,7 +509,6 @@ class Comments {
   moveDown() {
     let comment = this._comment;
     let attempt;
-    console.debug("moveDown from %o", comment.id);
 
     if (!this.isCollapsed(comment)) {
       attempt = this.findChild(comment);
@@ -502,14 +564,12 @@ class Comments {
       let author = comment.querySelector(".author");
       author.parentElement.appendChild(debug);
 
-      console.debug("comment %o debug %o", comment.id, debug);
       comment.classList.add("has-debug");
     });
   }
 
   register() {
     document.addEventListener("click", (e) => {
-      //console.debug("click %o", e);
       this.tryFindComment(e.target);
     });
 
@@ -519,7 +579,6 @@ class Comments {
   }
 
   main() {
-    console.debug("comment main...");
     this.register();
 
     this.setDebugIds();
@@ -534,17 +593,13 @@ async function init() {
   try {
     await loadIgnoredSubs();
 
-    console.debug("making listing instance");
     let m = new Listing();
     m.main();
 
-    console.debug("making comment instance");
     let c = new Comments();
     c.main();
-
-    console.info("done %o %o", m, new Date());
   } catch (e) {
-    console.debug("err %o", e);
+    console.error("err %o", e);
   }
 }
 
