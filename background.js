@@ -82,51 +82,38 @@ async function importIgnoredSubsFromArray(arr) {
   return true;
 }
 
-// Message handler API
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  (async () => {
-    try {
-      switch (message && message.action) {
-        case "getIgnoredSubs": {
-          const subs = await getAllIgnoredSubs();
-          sendResponse({ success: true, subs });
-          break;
-        }
-        case "setIgnoredSubs": {
-          await setAllIgnoredSubs(message.subs || []);
-          sendResponse({ success: true });
-          break;
-        }
-        case "addIgnoredSub": {
-          await addIgnoredSub(message.name);
-          sendResponse({ success: true });
-          break;
-        }
-        case "removeIgnoredSub": {
-          await removeIgnoredSub(message.name);
-          sendResponse({ success: true });
-          break;
-        }
-        case "exportIgnoredSubs": {
-          const json = await exportIgnoredSubs();
-          sendResponse({ success: true, data: json });
-          break;
-        }
-        case "importIgnoredSubs": {
-          // message.subs should be an array
-          await importIgnoredSubsFromArray(message.subs || []);
-          sendResponse({ success: true });
-          break;
-        }
-        default: {
-          sendResponse({ success: false, error: "unknown action" });
-        }
+browser.runtime.onMessage.addListener(async (message, sender) => {
+  try {
+    switch (message && message.action) {
+      case "getIgnoredSubs": {
+        const subs = await getAllIgnoredSubs();
+        return { success: true, subs };
       }
-    } catch (e) {
-      sendResponse({ success: false, error: e && e.message });
+      case "setIgnoredSubs": {
+        await setAllIgnoredSubs(message.subs || []);
+        return { success: true };
+      }
+      case "addIgnoredSub": {
+        await addIgnoredSub(message.name);
+        return { success: true };
+      }
+      case "removeIgnoredSub": {
+        await removeIgnoredSub(message.name);
+        return { success: true };
+      }
+      case "exportIgnoredSubs": {
+        const json = await exportIgnoredSubs();
+        return { success: true, data: json };
+      }
+      case "importIgnoredSubs": {
+        await importIgnoredSubsFromArray(message.subs || []);
+        return { success: true };
+      }
+      default:
+        return { success: false, error: "unknown action" };
     }
-  })();
-
-  // indicate we will respond asynchronously
-  return true;
+  } catch (e) {
+    console.error("Background Error:", e);
+    return { success: false, error: e?.message || "Internal error" };
+  }
 });

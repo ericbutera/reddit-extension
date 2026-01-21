@@ -1,40 +1,31 @@
 console.info("loading RE ext.");
 
 let IGNORED_SUBS = [];
+const DEFAULT_IGNORED_SUBS = [];
 
 // Storage helper functions
 async function loadIgnoredSubs() {
   try {
     const result = await sendMessageAsync({ action: "getIgnoredSubs" });
-    if (result && result.success && Array.isArray(result.subs)) {
+    if (result?.success && Array.isArray(result.subs)) {
       IGNORED_SUBS = result.subs;
-      console.info(
-        "Loaded %d ignored subs from background",
-        IGNORED_SUBS.length,
-      );
+      console.info("Loaded %d ignored subs", IGNORED_SUBS.length);
     } else {
-      // First time - save defaults to background
       await saveIgnoredSubs(DEFAULT_IGNORED_SUBS);
     }
   } catch (e) {
-    console.error("Error loading ignored subs: %o", e);
+    console.error("Error loading ignored subs:", e);
   }
 }
 
 async function saveIgnoredSubs(subs) {
   try {
     const resp = await sendMessageAsync({ action: "setIgnoredSubs", subs });
-    if (resp && resp.success) {
+    if (resp?.success) {
       IGNORED_SUBS = subs;
-      console.info("Saved %d ignored subs via background", subs.length);
-    } else {
-      console.error(
-        "Failed to save ignored subs via background",
-        resp && resp.error,
-      );
     }
   } catch (e) {
-    console.error("Error saving ignored subs: %o", e);
+    console.error("Error saving ignored subs:", e);
   }
 }
 
@@ -53,16 +44,13 @@ function removeIgnoredSub(subreddit) {
   sendMessageAsync({ action: "removeIgnoredSub", name: subreddit });
 }
 
-function sendMessageAsync(message) {
-  return new Promise((resolve) => {
-    try {
-      chrome.runtime.sendMessage(message, (resp) => {
-        resolve(resp);
-      });
-    } catch (e) {
-      resolve(null);
-    }
-  });
+async function sendMessageAsync(message) {
+  try {
+    return await browser.runtime.sendMessage(message);
+  } catch (e) {
+    console.error("Messaging error:", e);
+    return null;
+  }
 }
 
 // show a temporary toast with Undo action
@@ -593,13 +581,19 @@ async function init() {
   try {
     await loadIgnoredSubs();
 
-    let m = new Listing();
-    m.main();
+    // Only run Listing logic if on a listing page
+    if (document.querySelector("#siteTable")) {
+      let m = new Listing();
+      m.main();
+    }
 
-    let c = new Comments();
-    c.main();
+    // Only run Comments logic if on a comment page
+    if (document.querySelector(".nestedlisting")) {
+      let c = new Comments();
+      c.main();
+    }
   } catch (e) {
-    console.error("err %o", e);
+    console.error("Initialization error:", e);
   }
 }
 

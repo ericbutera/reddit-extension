@@ -1,18 +1,23 @@
 {
-    "manifest_version": 2,
+    "manifest_version": 3,
     "name": "Reddit tools",
     "version": "0.2",
     "description": "Keyboard shortcuts & subreddit management for Reddit.",
     "permissions": [
         "storage"
     ],
+    "host_permissions": [
+        "*://*.reddit.com/*"
+    ],
     "background": {
         "scripts": [
             "background.js"
-        ],
-        "persistent": false
+        ]
     },
-    "options_page": "options.html",
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": true
+    },
     "content_scripts": [
         {
             "matches": [
@@ -25,5 +30,16 @@
                 "extension.js"
             ]
         }
-    ]
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "reddit-tools@ericbutera.github.io",
+            "strict_min_version": "147.0",
+            "data_collection_permissions": {
+                "required": [
+                    "none"
+                ]
+            }
+        }
+    }
 }
