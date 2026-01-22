@@ -93,7 +93,8 @@ header {
 .pending-panel {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto; /* enable scrolling for long pending/content including stats */
+  padding-right: 6px; /* space for scrollbar */
 }
 
 #pendingList {
@@ -133,6 +134,16 @@ header {
   flex: none;
   word-break: break-word;
 }
+/* small badge showing hidden count */
+.sub-count {
+  margin-left: 8px;
+  background: #e6e6e6;
+  border-radius: 12px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: #333;
+  flex: none;
+}
 #pendingList {
   list-style: none;
   padding: 0;
@@ -150,4 +161,28 @@ header {
 .staged-remove {
   opacity: 0.6;
   text-decoration: line-through;
+}
+
+#statsTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  /* allow table to flow inside scrollable container */
+}
+/* Make table rows wrap long subreddit names instead of expanding the panel */
+#statsTable td,
+#statsTable th {
+  word-break: break-word;
+}
+#statsTable th,
+#statsTable td {
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+  text-align: left;
+}
+#statsTable th {
+  background: #f3f3f3;
+}
+#statsTable button {
+  padding: 4px 6px;
 }

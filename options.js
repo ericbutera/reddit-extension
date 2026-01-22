@@ -11,6 +11,7 @@ function sendMessageAsync(message) {
 let currentSubs = [];
 let stagedAdds = [];
 let stagedRemoves = [];
+let statsMap = {};
 
 function sortSubs(arr) {
   return arr.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -27,8 +28,13 @@ function renderList() {
     span.textContent = name;
     span.className = "sub-name";
     if (stagedRemoves.includes(name)) span.classList.add("staged-remove");
-    // event delegation will handle clicks on buttons
+    // show inline stat badge
+    const count = statsMap[name] || 0;
+    const badge = document.createElement("span");
+    badge.className = "sub-count";
+    badge.textContent = String(count);
     li.appendChild(span);
+    li.appendChild(badge);
     ul.appendChild(li);
   }
 }
@@ -63,6 +69,19 @@ async function load() {
   } else {
     currentSubs = [];
   }
+  renderList();
+  await loadStats();
+}
+
+async function loadStats() {
+  const resp = await sendMessageAsync({ action: "getStats" });
+  statsMap = {};
+  if (resp && resp.success && Array.isArray(resp.stats)) {
+    for (const row of resp.stats) {
+      statsMap[row.name] = row.count || 0;
+    }
+  }
+  // re-render list so badges update
   renderList();
 }
 
@@ -230,6 +249,7 @@ function setup() {
       currentSubs = newSubs.slice();
       renderList();
       renderPendingList();
+      await loadStats();
       alert("Saved changes");
     } else {
       alert("Save failed");
@@ -242,6 +262,8 @@ function setup() {
     renderList();
     renderPendingList();
   });
+
+  // no reset UI — stats shown inline next to each subreddit
 
   load();
 }

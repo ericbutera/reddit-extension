@@ -54,6 +54,7 @@ async function sendMessageAsync(message) {
 }
 
 // show a temporary toast with Undo action
+// TODO: refactor
 let __re_toast_el = null;
 function showUndoToast(text, undoFn, timeout = 5000) {
   try {
@@ -105,12 +106,8 @@ function showUndoToast(text, undoFn, timeout = 5000) {
 // TODO on refresh, remove current highlight
 
 class Listing {
-  //#pos = 0;
-  //#total = 0;
-  //#links = 0;
   constructor() {
     this._pos = 0;
-    //this.total = 0;
     this._links = [];
   }
 
@@ -257,14 +254,25 @@ class Listing {
       }),
     );
     if (res) {
+      // record stat for this hide (send to background which will batch writes)
+      try {
+        const subreddit = link.dataset && link.dataset.subreddit;
+        if (subreddit)
+          sendMessageAsync({
+            action: "incrementStat",
+            name: subreddit,
+            delta: 1,
+          });
+      } catch (e) {
+        console.warn("failed to send stat", e);
+      }
+
       // remove from dom
       link.parentNode.removeChild(link);
 
       // highlight next row
       this.refreshLinks();
       this.moveTo(this.pos());
-      //this.removeLink(this.pos()); // TODO remove link from array instead of refetch
-      //this.highlight(this.link(), true);
     }
   }
 
@@ -286,22 +294,36 @@ class Listing {
       const removedNode = link;
 
       addIgnoredSub(subreddit);
+      try {
+        sendMessageAsync({
+          action: "incrementStat",
+          name: subreddit,
+          delta: 1,
+        });
+      } catch (e) {
+        console.warn("sendMessage failed", e);
+      }
 
-      // remove from DOM immediately
       if (parent && removedNode.parentNode) parent.removeChild(removedNode);
 
-      // refresh links and keep position on the next item
       this.refreshLinks();
       this.moveTo(this.pos());
 
-      // show undo toast which will re-insert node and remove from ignored list
       showUndoToast(`${subreddit} ignored`, async () => {
         try {
-          // remove from ignored list
           removeIgnoredSub(subreddit);
-          // re-insert DOM node if possible
+          // decrement the stat since we un-ignored a single post removal
+          try {
+            await sendMessageAsync({
+              action: "incrementStat",
+              name: subreddit,
+              delta: -1,
+            });
+            await sendMessageAsync({ action: "flushPendingStats" });
+          } catch (e) {
+            console.warn("undo stat failed", e);
+          }
           if (parent) parent.insertBefore(removedNode, nextSibling);
-          // re-refresh links so navigation works
           this.refreshLinks();
           return true;
         } catch (e) {
@@ -374,18 +396,15 @@ class Comments {
   }
 
   isCollapsed(comment) {
-    // todo refactor into comment
     return comment.classList.contains("collapsed");
   }
 
   getData(comment) {
-    // todo refactor into comment
     return comment.dataset;
   }
 
   highlight(comment, enable) {
-    // todo refactor into comment
-    if (!comment) return; // TODO clean
+    if (!comment) return;
 
     if (enable) {
       comment.style.borderLeft = "3px solid yellow";
@@ -510,18 +529,14 @@ class Comments {
   }
 
   moveUp() {
-    // 1: find previous sibling
     let attempt;
     let comment = this._comment;
 
     attempt = this.findPreviousSibling(comment);
     if (attempt) return this.comment(attempt);
 
-    // 2: find parent node
     attempt = this.findParent(comment);
     if (attempt) return this.comment(attempt);
-
-    // it might be nice to say if parent found, jump to last comment?
   }
 
   toggleCollapse() {
@@ -576,18 +591,17 @@ class Comments {
   }
 }
 
-// Initialize extension after loading settings
 async function init() {
   try {
     await loadIgnoredSubs();
 
-    // Only run Listing logic if on a listing page
+    // Only run on listing page
     if (document.querySelector("#siteTable")) {
       let m = new Listing();
       m.main();
     }
 
-    // Only run Comments logic if on a comment page
+    // Only run on comment page
     if (document.querySelector(".nestedlisting")) {
       let c = new Comments();
       c.main();
