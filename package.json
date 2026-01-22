@@ -7,8 +7,8 @@
     "test:unit": "jest --passWithNoTests --testPathPatterns=__tests__",
     "test:e2e": "npx playwright test",
     "test:all": "npm run test:unit && npm run test:e2e",
-    "prepare-ext": "rm -rf dist && mkdir -p dist && cp -R src/* dist/",
-    "build-ext": "npm run prepare-ext && web-ext build --source-dir dist --artifacts-dir web-ext-artifacts",
+    "prepare-ext": "true",
+    "build-ext": "web-ext build --source-dir src --artifacts-dir web-ext-artifacts",
     "lint": "prettier --check \"src/**/*.{js,css,html,json}\" && web-ext lint --source-dir src",
     "format": "prettier --write \"src/**/*.{js,css,html,json}\""
   },
