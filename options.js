@@ -67,13 +67,14 @@ async function load() {
 }
 
 async function doExport() {
-  const resp = await sendMessageAsync({ action: "exportIgnoredSubs" });
-  if (resp && resp.success) {
-    const blob = new Blob([resp.data], { type: "application/json" });
+  const resp = await sendMessageAsync({ action: "getIgnoredSubs" });
+  if (resp && resp.success && Array.isArray(resp.subs)) {
+    const text = resp.subs.join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "ignored-subreddits.json";
+    a.download = "ignored-subreddits.txt";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -129,6 +130,15 @@ function setup() {
     const file = e.target.files && e.target.files[0];
     if (file) doImportFile(file);
     e.target.value = "";
+  });
+
+  document.getElementById("deleteAll").addEventListener("click", () => {
+    // stage removal of all current items
+    stagedRemoves = Array.from(new Set([...stagedRemoves, ...currentSubs]));
+    // if any of these were staged adds, unstage them
+    stagedAdds = stagedAdds.filter((a) => !stagedRemoves.includes(a));
+    renderList();
+    renderPendingList();
   });
 
   document.getElementById("addBtn").addEventListener("click", async () => {

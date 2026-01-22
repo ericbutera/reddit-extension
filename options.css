@@ -93,6 +93,7 @@ header {
 .pending-panel {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #pendingList {

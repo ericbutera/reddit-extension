@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "Reddit tools",
-    "version": "0.2",
+    "name": "Reddit Keyboard Navigation",
+    "version": "0.2.1",
     "description": "Keyboard shortcuts & subreddit management for Reddit.",
     "permissions": [
         "storage"
@@ -33,7 +33,7 @@
     ],
     "browser_specific_settings": {
         "gecko": {
-            "id": "e5945de4-2bc7-4900-848f-8447f9951dc4",
+            "id": "{e5945de4-2bc7-4900-848f-8447f9951dc4}",
             "strict_min_version": "147.0",
             "data_collection_permissions": {
                 "required": [

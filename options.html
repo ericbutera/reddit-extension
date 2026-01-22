@@ -12,20 +12,20 @@
           <h1>Ignored Subreddits</h1>
 
           <div class="header-actions row">
+            <button id="export">Export</button>
             <button
               id="import"
               onclick="document.getElementById('file').click()"
             >
-              Import JSON
+              Import
             </button>
+            <button id="deleteAll">Delete All</button>
             <input
               id="file"
               type="file"
-              accept="application/json"
+              accept=".txt, .json, text/plain, application/json"
               style="display: none"
             />
-
-            <button id="export">Export JSON</button>
           </div>
         </div>
       </header>
