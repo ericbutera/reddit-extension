@@ -33,7 +33,6 @@ function addIgnoredSub(subreddit) {
   if (!IGNORED_SUBS.includes(subreddit)) {
     const newSubs = [...IGNORED_SUBS, subreddit];
     saveIgnoredSubs(newSubs);
-    // notify background to persist single add as well
     sendMessageAsync({ action: "addIgnoredSub", name: subreddit });
   }
 }
@@ -54,29 +53,49 @@ async function sendMessageAsync(message) {
 }
 
 // show a temporary toast with Undo action
-// TODO: refactor
 let __re_toast_el = null;
-function showUndoToast(text, undoFn, timeout = 5000) {
+/**
+ * Ensure the toast template exists in the document. Inserts a <template>
+ * with id `re-toast-tpl` if not present.
+ */
+function ensureToastTemplate() {
+  if (document.getElementById("re-toast-tpl")) return;
   try {
+    const tpl = document.createElement("template");
+    tpl.id = "re-toast-tpl";
+    tpl.innerHTML = `
+      <div class="re-toast">
+        <span class="re-toast-msg" data-field="msg"></span>
+        <button class="re-toast-undo" data-field="btn">Undo</button>
+      </div>
+    `;
+    document.documentElement.appendChild(tpl);
+  } catch (e) {
+    console.error("ensureToastTemplate error", e);
+  }
+}
+
+async function showUndoToast(text, undoFn, timeout = 5000) {
+  try {
+    ensureToastTemplate();
+
     // remove existing
     if (__re_toast_el) __re_toast_el.remove();
 
-    const el = document.createElement("div");
-    el.className = "re-toast";
+    const tpl = document.getElementById("re-toast-tpl");
+    if (!tpl) return;
+    const frag = tpl.content.cloneNode(true);
+    const el = frag.querySelector(".re-toast") || frag.firstElementChild;
+    const msgEl = frag.querySelector("[data-field=msg]");
+    const btn = frag.querySelector("[data-field=btn]");
 
-    const msg = document.createElement("span");
-    msg.className = "re-toast-msg";
-    msg.textContent = text;
-    el.appendChild(msg);
-
-    const btn = document.createElement("button");
-    btn.className = "re-toast-undo";
-    btn.textContent = "Undo";
-    el.appendChild(btn);
+    if (msgEl) msgEl.textContent = text;
 
     let removed = false;
     const cleanup = () => {
-      if (el && el.parentNode) el.parentNode.removeChild(el);
+      try {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      } catch (e) {}
       __re_toast_el = null;
     };
 
@@ -84,17 +103,19 @@ function showUndoToast(text, undoFn, timeout = 5000) {
       if (!removed) cleanup();
     }, timeout);
 
-    btn.addEventListener("click", async () => {
-      if (removed) return;
-      removed = true;
-      clearTimeout(timer);
-      try {
-        await undoFn();
-      } catch (e) {
-        console.error("undo error", e);
-      }
-      cleanup();
-    });
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        if (removed) return;
+        removed = true;
+        clearTimeout(timer);
+        try {
+          await undoFn();
+        } catch (e) {
+          console.error("undo error", e);
+        }
+        cleanup();
+      });
+    }
 
     document.body.appendChild(el);
     __re_toast_el = el;
@@ -102,8 +123,6 @@ function showUndoToast(text, undoFn, timeout = 5000) {
     console.error("showUndoToast error", e);
   }
 }
-
-// TODO on refresh, remove current highlight
 
 class Listing {
   constructor() {
@@ -115,19 +134,16 @@ class Listing {
     if (pos != undefined) {
       this._pos = pos;
     }
-
     return this._pos;
   }
 
   total() {
     if (this._links) return this._links.length;
-
     return 0;
   }
 
   link() {
     if (this._links[this._pos]) return this._links[this._pos];
-
     return false;
   }
 
@@ -160,14 +176,12 @@ class Listing {
   }
 
   refreshLinks() {
-    console.log("refresh found links");
     this.filterIgnoredLinks();
     this._links = this._getLinks();
   }
 
   register() {
     document.addEventListener("click", (e) => {
-      // TODO ensure within .linklisting
       this.tryFindLink(e.target);
     });
 
@@ -189,6 +203,7 @@ class Listing {
   }
 
   handleKeys(e) {
+    // TODO: allow configurable bindings
     let pos = this.pos();
     let total = this.total();
 
@@ -264,7 +279,7 @@ class Listing {
             delta: 1,
           });
       } catch (e) {
-        console.warn("failed to send stat", e);
+        console.error("failed to send stat", e);
       }
 
       // remove from dom
@@ -301,7 +316,7 @@ class Listing {
           delta: 1,
         });
       } catch (e) {
-        console.warn("sendMessage failed", e);
+        console.error("sendMessage failed", e);
       }
 
       if (parent && removedNode.parentNode) parent.removeChild(removedNode);
@@ -312,7 +327,6 @@ class Listing {
       showUndoToast(`${subreddit} ignored`, async () => {
         try {
           removeIgnoredSub(subreddit);
-          // decrement the stat since we un-ignored a single post removal
           try {
             await sendMessageAsync({
               action: "incrementStat",
@@ -321,7 +335,7 @@ class Listing {
             });
             await sendMessageAsync({ action: "flushPendingStats" });
           } catch (e) {
-            console.warn("undo stat failed", e);
+            console.error("undo stat failed", e);
           }
           if (parent) parent.insertBefore(removedNode, nextSibling);
           this.refreshLinks();
@@ -359,9 +373,6 @@ class Comments {
     this._list = [];
     this._pos = 0;
     this._comment = undefined;
-
-    // TODO https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/StorageArea
-    // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Implement_a_settings_page
   }
 
   comments() {
@@ -391,7 +402,6 @@ class Comments {
 
   isComment(comment) {
     if (comment && comment.classList.contains("comment")) return true;
-
     return false;
   }
 
@@ -416,16 +426,13 @@ class Comments {
   tryFindComment(el) {
     let attempt = el.closest(".comment");
     if (!attempt) return false;
-
     this.comment(attempt);
   }
 
   handleKeys(e) {
     if (this._comment) {
       if (e.key == "x") this.toggleCollapse();
-
       if (e.key == "j") this.moveDown();
-
       if (e.key == "k") this.moveUp();
     }
   }
@@ -464,8 +471,7 @@ class Comments {
 
   findNextSibling(comment) {
     try {
-      let attempt;
-      attempt = comment.nextElementSibling;
+      let attempt = comment.nextElementSibling;
       if (!attempt) {
         return false;
       }
@@ -483,8 +489,7 @@ class Comments {
 
   findPreviousSibling(comment) {
     try {
-      let attempt;
-      attempt = comment.previousElementSibling;
+      let attempt = comment.previousElementSibling;
       if (!attempt) {
         return false;
       }
@@ -554,23 +559,6 @@ class Comments {
     );
   }
 
-  setDebugIds() {
-    let comments = document.querySelectorAll(
-      ".nestedlisting .comment:not(.has-debug)",
-    );
-    comments.forEach(function (comment) {
-      let debug = document.createElement("div");
-      debug.style =
-        "display: inline-block; max-width: 100px; border: 1px solid #ccc; border-radius: 3px; background-color: #eee; padding: 1px 4px 1px 4px;";
-      debug.innerText = comment.id;
-
-      let author = comment.querySelector(".author");
-      author.parentElement.appendChild(debug);
-
-      comment.classList.add("has-debug");
-    });
-  }
-
   register() {
     document.addEventListener("click", (e) => {
       this.tryFindComment(e.target);
@@ -584,8 +572,6 @@ class Comments {
   main() {
     this.register();
 
-    this.setDebugIds();
-
     let comment = document.querySelector(".nestedlisting .comment");
     if (comment) this.comment(comment);
   }
@@ -595,13 +581,11 @@ async function init() {
   try {
     await loadIgnoredSubs();
 
-    // Only run on listing page
     if (document.querySelector("#siteTable")) {
       let m = new Listing();
       m.main();
     }
 
-    // Only run on comment page
     if (document.querySelector(".nestedlisting")) {
       let c = new Comments();
       c.main();
