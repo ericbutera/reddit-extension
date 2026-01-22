@@ -10,7 +10,7 @@ class OptionsPage {
     // inject chrome mock and navigate to options page
     await injectChromeMock(page, initialState);
     // pages/ -> playwright/ -> tests/ -> repo root; need to go up three levels to reach repo root
-    const optionsPath = path.resolve(__dirname, '../../../dist/options.html');
+    const optionsPath = path.resolve(__dirname, '../../../src/options.html');
     await page.goto('file://' + optionsPath);
     await page.waitForSelector('body');
     return new OptionsPage(page);
