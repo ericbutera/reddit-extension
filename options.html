@@ -13,27 +13,6 @@
         </div>
       </header>
 
-      <!-- Templates for list items and stats rows -->
-      <template id="tpl-sub-item">
-        <li class="sub-item">
-          <span class="sub-name" data-field="name"></span>
-          <span class="sub-count" data-field="count"></span>
-        </li>
-      </template>
-
-      <template id="tpl-pending-item">
-        <li class="pending-item">
-          <span class="pending-text" data-field="text"></span>
-        </li>
-      </template>
-
-      <template id="tpl-stats-row">
-        <tr>
-          <td data-field="name"></td>
-          <td data-field="count"></td>
-        </tr>
-      </template>
-
       <div class="panels">
         <!-- left panel -->
         <div class="left-panel">
@@ -54,7 +33,6 @@
             <p>Staged adds/removals.</p>
             <ul id="pendingList"></ul>
             <div class="row">
-              <button id="deleteAll">Delete All</button>
               <button id="discardChanges">Discard</button>
               <button id="saveChanges">Save Changes</button>
             </div>
@@ -68,6 +46,7 @@
           <div class="row">
             <button id="export">Export</button>
             <button id="import">Import</button>
+            <button id="deleteAll">Delete All</button>
             <input
               id="file"
               type="file"
@@ -80,20 +59,32 @@
 
           <h2>Stats</h2>
           <div class="stats-content">
-            <table id="statsTable">
-              <thead>
-                <tr>
-                  <th>Subreddit</th>
-                  <th>Count</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <ul id="statsTable">
+            </ul>
           </div>
         </div>
         <!-- right panel-->
       </div>
     </div>
+
+    <template id="tpl-sub-item">
+      <li class="sub-item">
+        <span class="sub-count" data-field="count"></span>
+        <span class="sub-name" data-field="name"></span>
+      </li>
+    </template>
+    <template id="tpl-pending-item">
+      <li class="pending-item">
+        <span class="pending-text" data-field="text"></span>
+      </li>
+    </template>
+    <template id="tpl-stats-row">
+      <li>
+        <span data-field="count"></span>
+        <span data-field="name"></span>
+      </li>
+    </template>
+
     <script src="options.js"></script>
   </body>
 </html>

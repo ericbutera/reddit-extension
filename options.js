@@ -13,42 +13,6 @@ let stagedAdds = [];
 let stagedRemoves = [];
 let statsMap = {};
 
-function sortSubs(arr) {
-  return arr.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-}
-
-function renderList() {
-  const sorted = sortSubs([...currentSubs]);
-  const items = sorted.map((name) => {
-    const count = statsMap[name] || 0;
-    const item = {
-      name: name,
-      count: `${count} ignored`,
-      dataName: name,
-      class: stagedRemoves.includes(name) ? "staged-remove" : "",
-    };
-    return item;
-  });
-  renderTemplateList("#subsList", "tpl-sub-item", items);
-}
-
-function renderPendingList() {
-  const removals = sortSubs([...stagedRemoves]).map((name) => ({
-    text: `- ${name}`,
-    dataName: name,
-    class: "remove pending-item",
-  }));
-  const adds = sortSubs([...stagedAdds]).map((name) => ({
-    text: `+ ${name}`,
-    dataName: name,
-    class: "add pending-item",
-  }));
-  renderTemplateList("#pendingList", "tpl-pending-item", [
-    ...removals,
-    ...adds,
-  ]);
-}
-
 async function load() {
   const resp = await sendMessageAsync({ action: "getIgnoredSubs" });
   if (resp && resp.success && Array.isArray(resp.subs)) {
@@ -70,22 +34,25 @@ async function loadStats() {
   }
   // re-render list so badges update
   renderList();
-  // Populate stats table with top 10 blocked subreddits
+  // Populate stats panel with top 10 blocked subreddits, using the same badge template
   try {
-    const tbody = document.querySelector("#statsTable tbody");
-    if (tbody) {
+    const statsContainer = document.querySelector("#statsTable");
+    if (statsContainer) {
       const rows = Object.keys(statsMap).map((k) => ({
         name: k,
         count: statsMap[k],
       }));
       rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-      const top = rows
-        .slice(0, 10)
-        .map((r) => ({ name: r.name, count: String(r.count || 0) }));
-      renderTemplateList("#statsTable tbody", "tpl-stats-row", top);
+      const top = rows.slice(0, 10).map((r) => ({
+        name: r.name,
+        count: String(r.count || 0),
+        dataName: r.name,
+      }));
+      // render into the stats container (works for UL or TABLE as container)
+      renderTemplateList("#statsTable", "tpl-sub-item", top);
     }
   } catch (e) {
-    console.warn("populate stats table failed", e);
+    console.warn("populate stats panel failed", e);
   }
 }
 
@@ -187,6 +154,38 @@ function renderTemplateList(containerSelector, templateId, items) {
   }
 }
 
+function renderList() {
+  const sorted = sortSubs([...currentSubs]);
+  const items = sorted.map((name) => {
+    const count = statsMap[name] || 0;
+    const item = {
+      name: name,
+      count: `${count}`,
+      dataName: name,
+      class: stagedRemoves.includes(name) ? "staged-remove" : "",
+    };
+    return item;
+  });
+  renderTemplateList("#subsList", "tpl-sub-item", items);
+}
+
+function renderPendingList() {
+  const removals = sortSubs([...stagedRemoves]).map((name) => ({
+    text: `- ${name}`,
+    dataName: name,
+    class: "remove pending-item",
+  }));
+  const adds = sortSubs([...stagedAdds]).map((name) => ({
+    text: `+ ${name}`,
+    dataName: name,
+    class: "add pending-item",
+  }));
+  renderTemplateList("#pendingList", "tpl-pending-item", [
+    ...removals,
+    ...adds,
+  ]);
+}
+
 async function handleFileSelect(e) {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -200,6 +199,10 @@ async function handleFileSelect(e) {
   } catch (err) {
     alert("Error importing: " + (err && err.message));
   }
+}
+
+function sortSubs(arr) {
+  return arr.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
 
 function setup() {
