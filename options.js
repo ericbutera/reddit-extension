@@ -13,6 +13,45 @@ let stagedAdds = [];
 let stagedRemoves = [];
 let statsMap = {};
 
+// Normalize a subreddit name: remove optional leading /r/ or r/ and trim slashes/whitespace
+function normalizeSub(name) {
+  if (name == null) return "";
+  return String(name)
+    .trim()
+    .replace(/^\/?r\//i, "")
+    .replace(/^\/+|\/+$/g, "")
+    .trim();
+}
+
+// Refresh the UI panels in a single, safe sequence.
+// This avoids callers having to call loadStats() and renderList()
+// separately and prevents accidental render loops.
+const REFRESH_DEBOUNCE_MS = 150;
+let __refreshTimer = null;
+let __refreshResolvers = [];
+
+// Debounced refreshUI: coalesces multiple calls and resolves when the real
+// refresh (loadStats + render) completes.
+function refreshUI() {
+  return new Promise((resolve) => {
+    __refreshResolvers.push(resolve);
+    if (__refreshTimer) clearTimeout(__refreshTimer);
+    __refreshTimer = setTimeout(async () => {
+      __refreshTimer = null;
+      try {
+        await loadStats();
+        renderList();
+        renderPendingList();
+      } catch (err) {
+        console.warn("refreshUI: error during refresh", err);
+      }
+      const resolvers = __refreshResolvers.slice();
+      __refreshResolvers = [];
+      for (const r of resolvers) r();
+    }, REFRESH_DEBOUNCE_MS);
+  });
+}
+
 async function load() {
   const resp = await sendMessageAsync({ action: "getIgnoredSubs" });
   if (resp && resp.success && Array.isArray(resp.subs)) {
@@ -20,8 +59,7 @@ async function load() {
   } else {
     currentSubs = [];
   }
-  renderList();
-  await loadStats();
+  await refreshUI();
 }
 
 async function loadStats() {
@@ -32,28 +70,7 @@ async function loadStats() {
       statsMap[row.name] = row.count || 0;
     }
   }
-  // re-render list so badges update
-  renderList();
-  // Populate stats panel with top 10 blocked subreddits, using the same badge template
-  try {
-    const statsContainer = document.querySelector("#statsTable");
-    if (statsContainer) {
-      const rows = Object.keys(statsMap).map((k) => ({
-        name: k,
-        count: statsMap[k],
-      }));
-      rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-      const top = rows.slice(0, 10).map((r) => ({
-        name: r.name,
-        count: String(r.count || 0),
-        dataName: r.name,
-      }));
-      // render into the stats container (works for UL or TABLE as container)
-      renderTemplateList("#statsTable", "tpl-sub-item", top);
-    }
-  } catch (e) {
-    console.warn("populate stats panel failed", e);
-  }
+  renderStatsContainer();
 }
 
 async function doExport() {
@@ -82,6 +99,7 @@ function readFileAsText(file) {
     r.readAsText(file);
   });
 }
+
 /**
  * Parse raw import text into an array of normalized subreddit names.
  * Accepts JSON array or newline-separated text. Returns an array of unique, trimmed names.
@@ -99,13 +117,7 @@ function parseImport(text) {
       .filter(Boolean);
   }
   // normalize names (remove optional leading /r/ and whitespace) and dedupe
-  const normalized = arr
-    .map((s) =>
-      String(s || "")
-        .replace(/^\/?r\//i, "")
-        .trim(),
-    )
-    .filter(Boolean);
+  const normalized = arr.map((s) => normalizeSub(s)).filter(Boolean);
   return Array.from(new Set(normalized));
 }
 
@@ -154,6 +166,33 @@ function renderTemplateList(containerSelector, templateId, items) {
   }
 }
 
+function renderStatsContainer() {
+  const statsContainer = document.querySelector("#statsTable");
+  if (!statsContainer) return;
+
+  if (!statsMap || typeof statsMap !== "object") statsMap = {};
+
+  const tpl = document.getElementById("tpl-sub-item");
+  if (!tpl) return;
+
+  let rows = [];
+  try {
+    rows = Object.keys(statsMap).map((k) => ({ name: String(k), count: Number(statsMap[k]) || 0 }));
+  } catch (err) {
+    console.warn("renderStats: failed to build rows", err);
+    rows = [];
+  }
+
+  rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const top = rows.slice(0, 10).map((r) => ({
+    name: r.name || "",
+    count: String(r.count || 0),
+    dataName: r.name || "",
+  }));
+
+  renderTemplateList("#statsTable", "tpl-sub-item", top);
+}
+
 function renderList() {
   const sorted = sortSubs([...currentSubs]);
   const items = sorted.map((name) => {
@@ -180,10 +219,7 @@ function renderPendingList() {
     dataName: name,
     class: "add pending-item",
   }));
-  renderTemplateList("#pendingList", "tpl-pending-item", [
-    ...removals,
-    ...adds,
-  ]);
+  renderTemplateList("#pendingList", "tpl-pending-item", [...removals, ...adds]);
 }
 
 async function handleFileSelect(e) {
@@ -193,8 +229,7 @@ async function handleFileSelect(e) {
   try {
     const txt = await readFileAsText(file);
     await importFile(txt);
-    renderList();
-    renderPendingList();
+    await refreshUI();
     e.target.value = "";
   } catch (err) {
     alert("Error importing: " + (err && err.message));
@@ -205,123 +240,117 @@ function sortSubs(arr) {
   return arr.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
 
-function setup() {
-  document.getElementById("export").addEventListener("click", doExport);
-  document
-    .getElementById("import")
-    .addEventListener("click", () => document.getElementById("file").click());
-  document.getElementById("file").addEventListener("change", handleFileSelect);
+// Event handler functions
+async function handleClickDeleteAll(e) {
+  // stage removal of all current items
+  stagedRemoves = Array.from(new Set([...stagedRemoves, ...currentSubs]));
+  // if any of these were staged adds, unstage them
+  stagedAdds = stagedAdds.filter((a) => !stagedRemoves.includes(a));
+  await refreshUI();
+}
 
-  document.getElementById("deleteAll").addEventListener("click", () => {
-    // stage removal of all current items
-    stagedRemoves = Array.from(new Set([...stagedRemoves, ...currentSubs]));
-    // if any of these were staged adds, unstage them
-    stagedAdds = stagedAdds.filter((a) => !stagedRemoves.includes(a));
-    renderList();
-    renderPendingList();
-  });
+async function handleClickAddBtn(e) {
+  const val = document.getElementById("addInput").value.trim();
+  if (!val) return;
+  const normalized = normalizeSub(val);
+  if (!normalized) return;
+  // if currently staged for removal, unstage that instead
+  const removeIndex = stagedRemoves.indexOf(normalized);
+  if (removeIndex !== -1) {
+    stagedRemoves.splice(removeIndex, 1);
+  } else if (!currentSubs.includes(normalized) && !stagedAdds.includes(normalized)) {
+    stagedAdds.push(normalized);
+  }
+  document.getElementById("addInput").value = "";
+  await refreshUI();
+}
 
-  document.getElementById("addBtn").addEventListener("click", async () => {
-    const val = document.getElementById("addInput").value.trim();
-    if (!val) return;
-    const normalized = val.replace(/^\/?r\//i, "").trim();
-    if (!normalized) return;
-    // if currently staged for removal, unstage that instead
-    const removeIndex = stagedRemoves.indexOf(normalized);
-    if (removeIndex !== -1) {
-      stagedRemoves.splice(removeIndex, 1);
-    } else if (
-      !currentSubs.includes(normalized) &&
-      !stagedAdds.includes(normalized)
-    ) {
-      stagedAdds.push(normalized);
-    }
-    document.getElementById("addInput").value = "";
-    renderList();
-    renderPendingList();
-  });
+function handleKeydownAddInput(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("addBtn").click();
+  }
+}
 
-  // allow Enter to add
-  document.getElementById("addInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      document.getElementById("addBtn").click();
-    }
-  });
+async function handleClickSubsList(e) {
+  const btn = e.target.closest("button");
+  let name = null;
+  if (btn && btn.dataset && btn.dataset.name) {
+    name = btn.dataset.name;
+  } else {
+    const span = e.target.closest(".sub-name");
+    if (span) name = span.textContent && span.textContent.trim();
+  }
+  if (!name) return;
 
-  // delegated click handler on main list: stage removals (or unstage if already staged)
-  document.getElementById("subsList").addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    let name = null;
-    if (btn && btn.dataset && btn.dataset.name) {
-      name = btn.dataset.name;
+  // if it's staged as an add, remove that staging
+  const addIndex = stagedAdds.indexOf(name);
+  if (addIndex !== -1) {
+    stagedAdds.splice(addIndex, 1);
+  } else {
+    const remIndex = stagedRemoves.indexOf(name);
+    if (remIndex !== -1) {
+      stagedRemoves.splice(remIndex, 1);
     } else {
-      const span = e.target.closest(".sub-name");
-      if (span) name = span.textContent && span.textContent.trim();
+      stagedRemoves.push(name);
     }
-    if (!name) return;
+  }
 
-    // if it's staged as an add, remove that staging
-    const addIndex = stagedAdds.indexOf(name);
-    if (addIndex !== -1) {
-      stagedAdds.splice(addIndex, 1);
-    } else {
-      const remIndex = stagedRemoves.indexOf(name);
-      if (remIndex !== -1) {
-        stagedRemoves.splice(remIndex, 1);
-      } else {
-        stagedRemoves.push(name);
-      }
-    }
+  await refreshUI();
+}
 
-    renderList();
-    renderPendingList();
-  });
+async function handleClickPendingList(e) {
+  const li = e.target.closest("li");
+  if (!li || !li.dataset) return;
+  const name = li.dataset.name;
+  if (!name) return;
+  // remove from either stagedAdds or stagedRemoves
+  const aIdx = stagedAdds.indexOf(name);
+  if (aIdx !== -1) stagedAdds.splice(aIdx, 1);
+  const rIdx = stagedRemoves.indexOf(name);
+  if (rIdx !== -1) stagedRemoves.splice(rIdx, 1);
+  await refreshUI();
+}
 
-  // delegated click handler on pending list to unstage
-  document.getElementById("pendingList").addEventListener("click", (e) => {
-    const li = e.target.closest("li");
-    if (!li || !li.dataset) return;
-    const name = li.dataset.name;
-    if (!name) return;
-    // remove from either stagedAdds or stagedRemoves
-    const aIdx = stagedAdds.indexOf(name);
-    if (aIdx !== -1) stagedAdds.splice(aIdx, 1);
-    const rIdx = stagedRemoves.indexOf(name);
-    if (rIdx !== -1) stagedRemoves.splice(rIdx, 1);
-    renderList();
-    renderPendingList();
-  });
-
-  document.getElementById("saveChanges").addEventListener("click", async () => {
-    // apply staged changes
-    let newSubs = currentSubs.filter((s) => !stagedRemoves.includes(s));
-    for (const a of stagedAdds) {
-      if (!newSubs.includes(a)) newSubs.push(a);
-    }
-    newSubs = sortSubs([...new Set(newSubs)]);
-    const resp = await sendMessageAsync({
-      action: "setIgnoredSubs",
-      subs: newSubs,
-    });
-    if (resp && resp.success) {
-      stagedAdds = [];
-      stagedRemoves = [];
-      currentSubs = newSubs.slice();
-      renderList();
-      renderPendingList();
-      await loadStats();
-    } else {
-      alert("Save failed");
-    }
-  });
-
-  document.getElementById("discardChanges").addEventListener("click", () => {
+async function handleClickSaveChanges(e) {
+  // apply staged changes
+  let newSubs = currentSubs.filter((s) => !stagedRemoves.includes(s));
+  for (const a of stagedAdds) {
+    if (!newSubs.includes(a)) newSubs.push(a);
+  }
+  newSubs = sortSubs([...new Set(newSubs)]);
+  const resp = await sendMessageAsync({ action: "setIgnoredSubs", subs: newSubs });
+  if (resp && resp.success) {
     stagedAdds = [];
     stagedRemoves = [];
-    renderList();
-    renderPendingList();
-  });
+    currentSubs = newSubs.slice();
+    await refreshUI();
+  } else {
+    alert("Save failed");
+  }
+}
+
+async function handleClickDiscardChanges(e) {
+  stagedAdds = [];
+  stagedRemoves = [];
+  await refreshUI();
+}
+
+function handleFileClick(e) {
+  document.getElementById("file").click();
+}
+
+function setup() {
+  document.getElementById("export").addEventListener("click", doExport);
+  document.getElementById("import").addEventListener("click", handleFileClick);
+  document.getElementById("file").addEventListener("change", handleFileSelect);
+  document.getElementById("deleteAll").addEventListener("click", handleClickDeleteAll);
+  document.getElementById("addBtn").addEventListener("click", handleClickAddBtn);
+  document.getElementById("addInput").addEventListener("keydown", handleKeydownAddInput);
+  document.getElementById("subsList").addEventListener("click", handleClickSubsList);
+  document.getElementById("pendingList").addEventListener("click", handleClickPendingList);
+  document.getElementById("saveChanges").addEventListener("click", handleClickSaveChanges);
+  document.getElementById("discardChanges").addEventListener("click", handleClickDiscardChanges);
 
   load();
 }

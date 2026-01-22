@@ -46,9 +46,7 @@ async function withStore(storeName, mode, callback) {
   });
 }
 const getAllIgnoredSubs = () =>
-  withStore(STORE_NAME, "readonly", (s) => s.getAll()).then((res) =>
-    res.map((r) => r.name),
-  );
+  withStore(STORE_NAME, "readonly", (s) => s.getAll()).then((res) => res.map((r) => r.name));
 
 async function setAllIgnoredSubs(subs) {
   return withStore(STORE_NAME, "readwrite", (store) => {
@@ -58,18 +56,16 @@ async function setAllIgnoredSubs(subs) {
   });
 }
 
-const addIgnoredSub = (name) =>
-  withStore(STORE_NAME, "readwrite", (s) => s.put({ name }));
+const addIgnoredSub = (name) => withStore(STORE_NAME, "readwrite", (s) => s.put({ name }));
 
-const removeIgnoredSub = (name) =>
-  withStore(STORE_NAME, "readwrite", (s) => s.delete(name));
+const removeIgnoredSub = (name) => withStore(STORE_NAME, "readwrite", (s) => s.delete(name));
 
-const exportIgnoredSubs = async () =>
-  JSON.stringify(await getAllIgnoredSubs(), null, 2);
+const exportIgnoredSubs = async () => JSON.stringify(await getAllIgnoredSubs(), null, 2);
 const getAllStats = () =>
   withStore(STATS_STORE, "readonly", (s) => s.getAll()).then((res) =>
     res.map((r) => ({ name: r.name, count: r.count || 0 })),
   );
+
 function incrementStat(name, delta = 1) {
   if (!name) return;
   __pending_stats[name] = (__pending_stats[name] || 0) + delta;
@@ -78,8 +74,7 @@ function incrementStat(name, delta = 1) {
 
 const resetStats = () => withStore(STATS_STORE, "readwrite", (s) => s.clear());
 
-const clearStat = (name) =>
-  withStore(STATS_STORE, "readwrite", (s) => s.delete(name));
+const clearStat = (name) => withStore(STATS_STORE, "readwrite", (s) => s.delete(name));
 
 async function importIgnoredSubsFromArray(arr) {
   if (!Array.isArray(arr)) throw new Error("import expects array");
@@ -91,6 +86,7 @@ async function importIgnoredSubsFromArray(arr) {
 let __pending_stats = {};
 let __pending_stats_timer = null;
 const PENDING_FLUSH_MS = 1500;
+
 function scheduleFlushPendingStats() {
   if (__pending_stats_timer) return;
   __pending_stats_timer = setTimeout(() => {
