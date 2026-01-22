@@ -63,7 +63,7 @@ const removeIgnoredSub = (name) => withStore(STORE_NAME, "readwrite", (s) => s.d
 const exportIgnoredSubs = async () => JSON.stringify(await getAllIgnoredSubs(), null, 2);
 const getAllStats = () =>
   withStore(STATS_STORE, "readonly", (s) => s.getAll()).then((res) =>
-    res.map((r) => ({ name: r.name, count: r.count || 0 })),
+    res.map((r) => ({ name: r.name, count: r.count || 0 }))
   );
 
 function incrementStat(name, delta = 1) {
