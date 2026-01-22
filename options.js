@@ -18,48 +18,35 @@ function sortSubs(arr) {
 }
 
 function renderList() {
-  const ul = document.getElementById("subsList");
-  ul.innerHTML = "";
   const sorted = sortSubs([...currentSubs]);
-  for (const name of sorted) {
-    const li = document.createElement("li");
-    li.className = "sub-item";
-    const span = document.createElement("span");
-    span.textContent = name;
-    span.className = "sub-name";
-    if (stagedRemoves.includes(name)) span.classList.add("staged-remove");
-    // show inline stat badge
+  const items = sorted.map((name) => {
     const count = statsMap[name] || 0;
-    const badge = document.createElement("span");
-    badge.className = "sub-count";
-    badge.textContent = String(count);
-    li.appendChild(span);
-    li.appendChild(badge);
-    ul.appendChild(li);
-  }
+    const item = {
+      name: name,
+      count: `${count} ignored`,
+      dataName: name,
+      class: stagedRemoves.includes(name) ? "staged-remove" : "",
+    };
+    return item;
+  });
+  renderTemplateList("#subsList", "tpl-sub-item", items);
 }
 
 function renderPendingList() {
-  const ul = document.getElementById("pendingList");
-  ul.innerHTML = "";
-
-  // show removals first
-  for (const name of sortSubs([...stagedRemoves])) {
-    const li = document.createElement("li");
-    li.className = "pending-item remove";
-    li.textContent = "- " + name;
-    li.dataset.name = name;
-    ul.appendChild(li);
-  }
-
-  // then adds
-  for (const name of sortSubs([...stagedAdds])) {
-    const li = document.createElement("li");
-    li.className = "pending-item add";
-    li.textContent = "+ " + name;
-    li.dataset.name = name;
-    ul.appendChild(li);
-  }
+  const removals = sortSubs([...stagedRemoves]).map((name) => ({
+    text: `- ${name}`,
+    dataName: name,
+    class: "remove pending-item",
+  }));
+  const adds = sortSubs([...stagedAdds]).map((name) => ({
+    text: `+ ${name}`,
+    dataName: name,
+    class: "add pending-item",
+  }));
+  renderTemplateList("#pendingList", "tpl-pending-item", [
+    ...removals,
+    ...adds,
+  ]);
 }
 
 async function load() {
@@ -83,6 +70,23 @@ async function loadStats() {
   }
   // re-render list so badges update
   renderList();
+  // Populate stats table with top 10 blocked subreddits
+  try {
+    const tbody = document.querySelector("#statsTable tbody");
+    if (tbody) {
+      const rows = Object.keys(statsMap).map((k) => ({
+        name: k,
+        count: statsMap[k],
+      }));
+      rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      const top = rows
+        .slice(0, 10)
+        .map((r) => ({ name: r.name, count: String(r.count || 0) }));
+      renderTemplateList("#statsTable tbody", "tpl-stats-row", top);
+    }
+  } catch (e) {
+    console.warn("populate stats table failed", e);
+  }
 }
 
 async function doExport() {
@@ -111,45 +115,99 @@ function readFileAsText(file) {
     r.readAsText(file);
   });
 }
-
-async function doImportFile(file) {
+/**
+ * Parse raw import text into an array of normalized subreddit names.
+ * Accepts JSON array or newline-separated text. Returns an array of unique, trimmed names.
+ */
+function parseImport(text) {
+  if (!text) return [];
+  let arr = [];
   try {
-    const txt = await readFileAsText(file);
-    let arr;
-    try {
-      arr = JSON.parse(txt);
-    } catch (_) {
-      // fallback: try newline-separated
-      arr = txt
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean);
+    arr = JSON.parse(text);
+    if (!Array.isArray(arr)) arr = [];
+  } catch (_) {
+    arr = text
+      .split(/\r?\n/)
+      .map((s) => String(s || "").trim())
+      .filter(Boolean);
+  }
+  // normalize names (remove optional leading /r/ and whitespace) and dedupe
+  const normalized = arr
+    .map((s) =>
+      String(s || "")
+        .replace(/^\/?r\//i, "")
+        .trim(),
+    )
+    .filter(Boolean);
+  return Array.from(new Set(normalized));
+}
+
+/**
+ * Import raw text by parsing and staging names into Pending Changes.
+ * Keeps UI updates and alerts centralized.
+ */
+async function importFile(text) {
+  try {
+    const names = parseImport(text);
+    for (const name of names) {
+      const remIdx = stagedRemoves.indexOf(name);
+      if (remIdx !== -1) {
+        stagedRemoves.splice(remIdx, 1);
+      } else if (!currentSubs.includes(name) && !stagedAdds.includes(name)) {
+        stagedAdds.push(name);
+      }
     }
-    if (!Array.isArray(arr)) throw new Error("Imported data is not an array");
-    const resp = await sendMessageAsync({
-      action: "importIgnoredSubs",
-      subs: arr,
-    });
-    if (resp && resp.success) {
-      await load();
-      alert("Imported successfully");
-    } else {
-      alert("Import failed");
-    }
-  } catch (e) {
-    alert("Error importing: " + (e && e.message));
+  } catch (err) {
+    alert("Error importing: " + (err && err.message));
   }
 }
+
+/**
+ * Render a list of items using a <template> with `data-field` placeholders.
+ * Each item is an object whose keys map to `data-field` attributes inside the template.
+ * Optional `class` string will be added to the template root element, and
+ * optional `dataName` will be written to `data-name` on the root element.
+ */
+function renderTemplateList(containerSelector, templateId, items) {
+  const container = document.querySelector(containerSelector);
+  if (!container) return;
+  container.innerHTML = "";
+  const tpl = document.getElementById(templateId);
+  if (!tpl) return;
+  for (const item of items) {
+    const frag = tpl.content.cloneNode(true);
+    const root = frag.firstElementChild;
+    for (const k of Object.keys(item)) {
+      const el = frag.querySelector(`[data-field="${k}"]`);
+      if (el) el.textContent = item[k];
+    }
+    if (item.class && root) root.classList.add(...item.class.split(" "));
+    if (item.dataName && root) root.dataset.name = item.dataName;
+    container.appendChild(frag);
+  }
+}
+
+async function handleFileSelect(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  try {
+    const txt = await readFileAsText(file);
+    await importFile(txt);
+    renderList();
+    renderPendingList();
+    e.target.value = "";
+  } catch (err) {
+    alert("Error importing: " + (err && err.message));
+  }
+}
+
 function setup() {
   document.getElementById("export").addEventListener("click", doExport);
   document
     .getElementById("import")
     .addEventListener("click", () => document.getElementById("file").click());
-  document.getElementById("file").addEventListener("change", (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (file) doImportFile(file);
-    e.target.value = "";
-  });
+  document.getElementById("file").addEventListener("change", handleFileSelect);
 
   document.getElementById("deleteAll").addEventListener("click", () => {
     // stage removal of all current items
@@ -250,7 +308,6 @@ function setup() {
       renderList();
       renderPendingList();
       await loadStats();
-      alert("Saved changes");
     } else {
       alert("Save failed");
     }
@@ -262,8 +319,6 @@ function setup() {
     renderList();
     renderPendingList();
   });
-
-  // no reset UI — stats shown inline next to each subreddit
 
   load();
 }

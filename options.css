@@ -24,8 +24,6 @@ header {
   flex-shrink: 0; /* Header won't shrink */
   margin-bottom: 20px;
 }
-
-/* header layout: title left, actions right */
 .header-top {
   display: flex;
   align-items: center;
@@ -37,12 +35,6 @@ header {
   margin: 0;
   font-size: 1.25rem;
 }
-.header-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
 .container h2 {
   font-size: 1rem;
   margin: 0 0 2px 0;
@@ -51,21 +43,51 @@ header {
 /* The Layout Engine */
 .panels {
   display: flex;
-  flex: 1; /* Takes up all remaining vertical space */
-  gap: 20px;
-  overflow: hidden; /* Critical: keeps the panels from expanding the page */
+  flex: 1;
+  gap: 15px; /* Reduced gap slightly for 3 columns */
+  overflow: hidden;
+}
+
+.panel-separator {
+  margin: 15px 0;
 }
 
 /* Scrollable Left Panel */
 .left-panel {
-  flex: 1;
+  /* Changed flex: 1 to auto so it doesn't force growth */
+  flex: 0 1 auto;
+  min-width: 250px; /* Ensures it doesn't get too skinny */
+  max-width: 400px; /* Optional: prevents it from getting too wide */
   display: flex;
   flex-direction: column;
   overflow: hidden;
-
   background: #f9f9f9;
   padding: 15px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.center-panel {
+  width: auto; /* Allow it to shrink to content */
+  min-width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.right-panel {
+  width: auto; /* Allow it to shrink to content */
+  min-width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
   border: 1px solid #eee;
 }
 
@@ -77,24 +99,10 @@ header {
   margin: 0;
   list-style: none;
 }
-
-/* Fixed Right Panel */
-.right-panel {
-  width: 320px;
-  flex-shrink: 0; /* Stops the right panel from getting squashed */
-  display: flex;
-  flex-direction: column;
-  background: #f9f9f9;
-  padding: 15px;
-  border-radius: 8px 0 0 8px;
-  border: 1px solid #eee;
-}
-
 .pending-panel {
   display: flex;
   flex-direction: column;
   overflow: auto; /* enable scrolling for long pending/content including stats */
-  padding-right: 6px; /* space for scrollbar */
 }
 
 #pendingList {
@@ -102,15 +110,12 @@ header {
   overflow-y: auto; /* If pending list gets long, it scrolls too */
   margin-bottom: 15px;
 }
-
 .row {
   display: flex;
   gap: 10px;
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
-
-/* sub list */
 #addInput {
   padding: 6px 8px;
   font-size: 14px;
@@ -163,26 +168,7 @@ header {
   text-decoration: line-through;
 }
 
-#statsTable {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 8px;
-  /* allow table to flow inside scrollable container */
-}
-/* Make table rows wrap long subreddit names instead of expanding the panel */
-#statsTable td,
-#statsTable th {
-  word-break: break-word;
-}
-#statsTable th,
-#statsTable td {
-  border: 1px solid #ddd;
-  padding: 6px 8px;
-  text-align: left;
-}
-#statsTable th {
-  background: #f3f3f3;
-}
-#statsTable button {
-  padding: 4px 6px;
+.stats-content {
+  flex: 1;
+  overflow-y: auto; /* Makes stats scrollable if the list is long */
 }

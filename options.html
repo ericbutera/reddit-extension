@@ -10,35 +10,41 @@
       <header>
         <div class="header-top">
           <h1>Ignored Subreddits</h1>
-
-          <div class="header-actions row">
-            <button id="export">Export</button>
-            <button
-              id="import"
-              onclick="document.getElementById('file').click()"
-            >
-              Import
-            </button>
-            <button id="deleteAll">Delete All</button>
-            <input
-              id="file"
-              type="file"
-              accept=".txt, .json, text/plain, application/json"
-              style="display: none"
-            />
-          </div>
         </div>
       </header>
 
+      <!-- Templates for list items and stats rows -->
+      <template id="tpl-sub-item">
+        <li class="sub-item">
+          <span class="sub-name" data-field="name"></span>
+          <span class="sub-count" data-field="count"></span>
+        </li>
+      </template>
+
+      <template id="tpl-pending-item">
+        <li class="pending-item">
+          <span class="pending-text" data-field="text"></span>
+        </li>
+      </template>
+
+      <template id="tpl-stats-row">
+        <tr>
+          <td data-field="name"></td>
+          <td data-field="count"></td>
+        </tr>
+      </template>
+
       <div class="panels">
+        <!-- left panel -->
         <div class="left-panel">
           <h2>Active List</h2>
           <ul id="subsList"></ul>
         </div>
+        <!-- left panel -->
 
-        <div class="right-panel">
+        <!-- center panel -->
+        <div class="center-panel">
           <h2>Pending Changes</h2>
-
           <div class="row">
             <input id="addInput" placeholder="subreddit name (no /r/)" />
             <button id="addBtn">Add</button>
@@ -48,11 +54,44 @@
             <p>Staged adds/removals.</p>
             <ul id="pendingList"></ul>
             <div class="row">
+              <button id="deleteAll">Delete All</button>
               <button id="discardChanges">Discard</button>
               <button id="saveChanges">Save Changes</button>
             </div>
           </div>
         </div>
+        <!-- center panel -->
+
+        <!-- right panel -->
+        <div class="right-panel">
+          <h2>Bulk Actions</h2>
+          <div class="row">
+            <button id="export">Export</button>
+            <button id="import">Import</button>
+            <input
+              id="file"
+              type="file"
+              accept=".txt, .json, text/plain, application/json"
+              style="display: none"
+            />
+          </div>
+
+          <div class="panel-separator"></div>
+
+          <h2>Stats</h2>
+          <div class="stats-content">
+            <table id="statsTable">
+              <thead>
+                <tr>
+                  <th>Subreddit</th>
+                  <th>Count</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- right panel-->
       </div>
     </div>
     <script src="options.js"></script>

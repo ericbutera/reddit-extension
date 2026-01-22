@@ -70,16 +70,10 @@ const getAllStats = () =>
   withStore(STATS_STORE, "readonly", (s) => s.getAll()).then((res) =>
     res.map((r) => ({ name: r.name, count: r.count || 0 })),
   );
-async function incrementStat(name, delta = 1) {
-  return withStore(STATS_STORE, "readwrite", (store) => {
-    const req = store.get(name);
-    req.onsuccess = () => {
-      const rec = req.result || { name, count: 0 };
-      rec.count = (rec.count || 0) + delta;
-      store.put(rec);
-    };
-    return true;
-  });
+function incrementStat(name, delta = 1) {
+  if (!name) return;
+  __pending_stats[name] = (__pending_stats[name] || 0) + delta;
+  scheduleFlushPendingStats();
 }
 
 const resetStats = () => withStore(STATS_STORE, "readwrite", (s) => s.clear());
@@ -154,23 +148,14 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
         return { success: true, stats };
       }
       case "incrementStat": {
-        // Buffer increments in-memory and flush on a short timer to avoid
-        // frequent IndexedDB writes. Message still returns immediately.
-        const name = message.name;
-        const delta = message.delta || 1;
-        if (name) {
-          __pending_stats[name] = (__pending_stats[name] || 0) + delta;
-          scheduleFlushPendingStats();
-        }
+        incrementStat(message.name, message.delta || 1);
         return { success: true };
       }
       case "incrementStatsBulk": {
-        // Merge incoming bulk stats into the in-memory buffer and schedule a flush
         const stats = message.stats || {};
-        Object.keys(stats).forEach((n) => {
-          __pending_stats[n] = (__pending_stats[n] || 0) + (stats[n] || 0);
-        });
-        scheduleFlushPendingStats();
+        for (const [name, delta] of Object.entries(stats)) {
+          incrementStat(name, delta);
+        }
         return { success: true };
       }
       case "resetStats": {
@@ -201,3 +186,10 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
     return { success: false, error: e?.message || "Internal error" };
   }
 });
+
+if (typeof browser !== "undefined" && browser.runtime?.onSuspend) {
+  browser.runtime.onSuspend.addListener(() => {
+    console.debug("onSuspend: flushing pending stats");
+    flushPendingStats(); // Final attempt to save before the plugin sleeps
+  });
+}
