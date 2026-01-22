@@ -37,7 +37,7 @@ header {
 }
 .container h2 {
   font-size: 1rem;
-  margin: 0 0 2px 0;
+  margin: 0 0 5px 0;
 }
 
 /* The Layout Engine */
@@ -91,13 +91,32 @@ header {
   border: 1px solid #eee;
 }
 
-#subsList {
+/* make lists visually clean with no bullets */
+#subsList,
+#pendingList,
+#statsTable {
   flex: 1;
   overflow-y: auto; /* This enables the scrolling for the list */
-  border: 1px solid #ddd;
   padding: 10px;
   margin: 0;
   list-style: none;
+}
+#subsList,
+#pendingList,
+#statsTable {
+  flex: 1;
+  overflow-y: auto; /* This enables the scrolling for the list */
+  padding: 10px;
+  margin: 0;
+  list-style: none;
+}
+
+/* Remove box border for active and stats lists to create a cleaner look */
+#subsList,
+#statsTable {
+  border: none;
+  background: transparent;
+  padding-left: 0;
 }
 .pending-panel {
   display: flex;
@@ -130,7 +149,6 @@ header {
   margin-top: 12px;
 }
 #subsList li.sub-item {
-  margin: 4px 0;
   display: flex;
   align-items: center;
 }
@@ -141,13 +159,14 @@ header {
 }
 /* small badge showing hidden count */
 .sub-count {
-  margin-left: 8px;
   background: #e6e6e6;
   border-radius: 12px;
   padding: 2px 6px;
+  margin-right: 8px;
   font-size: 12px;
   color: #333;
   flex: none;
+  text-align: center;
 }
 #pendingList {
   list-style: none;
@@ -171,4 +190,7 @@ header {
 .stats-content {
   flex: 1;
   overflow-y: auto; /* Makes stats scrollable if the list is long */
+}
+.sub-item {
+  margin: 10px 0;
 }
