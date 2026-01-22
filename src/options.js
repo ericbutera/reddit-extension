@@ -1,4 +1,4 @@
-// options.js - handles import/export and editing ignored subreddits
+console.log("options page loaded");
 
 function sendMessageAsync(message) {
   return new Promise((resolve) => {

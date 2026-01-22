@@ -1,2 +1,14 @@
-web-ext-artifacts/**
+dist
 node_modules
+test-results
+web-ext-artifacts
+
+# Generated test fixtures (created at test runtime)
+tests/fixtures/
+
+# Playwright reports
+playwright-report/
+playwright-report.zip
+
+# Coverage reports
+coverage/

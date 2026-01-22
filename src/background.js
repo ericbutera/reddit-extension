@@ -1,4 +1,5 @@
 // background.js - service worker handling IndexedDB for ignored subreddits
+console.log("background service worker loaded");
 
 const DB_NAME = "reddit_ext_db";
 const DB_VERSION = 2;
@@ -63,7 +64,7 @@ const removeIgnoredSub = (name) => withStore(STORE_NAME, "readwrite", (s) => s.d
 const exportIgnoredSubs = async () => JSON.stringify(await getAllIgnoredSubs(), null, 2);
 const getAllStats = () =>
   withStore(STATS_STORE, "readonly", (s) => s.getAll()).then((res) =>
-    res.map((r) => ({ name: r.name, count: r.count || 0 }))
+    res.map((r) => ({ name: r.name, count: r.count || 0 })),
   );
 
 function incrementStat(name, delta = 1) {
@@ -116,71 +117,86 @@ async function flushPendingStats() {
   });
 }
 
-browser.runtime.onMessage.addListener(async (message, sender) => {
-  try {
-    switch (message && message.action) {
-      case "getIgnoredSubs": {
-        const subs = await getAllIgnoredSubs();
-        return { success: true, subs };
-      }
-      case "setIgnoredSubs": {
-        await setAllIgnoredSubs(message.subs || []);
-        return { success: true };
-      }
-      case "addIgnoredSub": {
-        await addIgnoredSub(message.name);
-        return { success: true };
-      }
-      case "removeIgnoredSub": {
-        await removeIgnoredSub(message.name);
-        return { success: true };
-      }
-      case "exportIgnoredSubs": {
-        const json = await exportIgnoredSubs();
-        return { success: true, data: json };
-      }
-      case "getStats": {
-        const stats = await getAllStats();
-        return { success: true, stats };
-      }
-      case "incrementStat": {
-        incrementStat(message.name, message.delta || 1);
-        return { success: true };
-      }
-      case "incrementStatsBulk": {
-        const stats = message.stats || {};
-        for (const [name, delta] of Object.entries(stats)) {
-          incrementStat(name, delta);
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  (async () => {
+    try {
+      switch (message && message.action) {
+        case "getIgnoredSubs": {
+          const subs = await getAllIgnoredSubs();
+          sendResponse({ success: true, subs });
+          return;
         }
-        return { success: true };
-      }
-      case "resetStats": {
-        await resetStats();
-        return { success: true };
-      }
-      case "clearStat": {
-        await clearStat(message.name);
-        return { success: true };
-      }
-      case "flushPendingStats": {
-        try {
-          await flushPendingStats();
-          return { success: true };
-        } catch (e) {
-          return { success: false, error: e?.message };
+        case "setIgnoredSubs": {
+          await setAllIgnoredSubs(message.subs || []);
+          sendResponse({ success: true });
+          return;
         }
+        case "addIgnoredSub": {
+          await addIgnoredSub(message.name);
+          sendResponse({ success: true });
+          return;
+        }
+        case "removeIgnoredSub": {
+          await removeIgnoredSub(message.name);
+          sendResponse({ success: true });
+          return;
+        }
+        case "exportIgnoredSubs": {
+          const json = await exportIgnoredSubs();
+          sendResponse({ success: true, data: json });
+          return;
+        }
+        case "getStats": {
+          const stats = await getAllStats();
+          sendResponse({ success: true, stats });
+          return;
+        }
+        case "incrementStat": {
+          incrementStat(message.name, message.delta || 1);
+          sendResponse({ success: true });
+          return;
+        }
+        case "incrementStatsBulk": {
+          const stats = message.stats || {};
+          for (const [name, delta] of Object.entries(stats)) {
+            incrementStat(name, delta);
+          }
+          sendResponse({ success: true });
+          return;
+        }
+        case "resetStats": {
+          await resetStats();
+          sendResponse({ success: true });
+          return;
+        }
+        case "clearStat": {
+          await clearStat(message.name);
+          sendResponse({ success: true });
+          return;
+        }
+        case "flushPendingStats": {
+          try {
+            await flushPendingStats();
+            sendResponse({ success: true });
+          } catch (e) {
+            sendResponse({ success: false, error: e?.message });
+          }
+          return;
+        }
+        case "importIgnoredSubs": {
+          await importIgnoredSubsFromArray(message.subs || []);
+          sendResponse({ success: true });
+          return;
+        }
+        default:
+          sendResponse({ success: false, error: "unknown action" });
       }
-      case "importIgnoredSubs": {
-        await importIgnoredSubsFromArray(message.subs || []);
-        return { success: true };
-      }
-      default:
-        return { success: false, error: "unknown action" };
+    } catch (e) {
+      console.error("Background Error:", e);
+      sendResponse({ success: false, error: e?.message || "Internal error" });
     }
-  } catch (e) {
-    console.error("Background Error:", e);
-    return { success: false, error: e?.message || "Internal error" };
-  }
+  })();
+  return true; // Keep the message channel open for async response
 });
 
 if (typeof browser !== "undefined" && browser.runtime?.onSuspend) {

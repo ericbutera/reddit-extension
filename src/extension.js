@@ -264,7 +264,7 @@ class Listing {
         view: window,
         bubbles: true,
         cancelable: true,
-      })
+      }),
     );
     if (res) {
       // record stat for this hide (send to background which will batch writes)
@@ -553,7 +553,7 @@ class Comments {
         view: window,
         bubbles: true,
         cancelable: true,
-      })
+      }),
     );
   }
 
